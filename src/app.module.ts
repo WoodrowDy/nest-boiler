@@ -1,10 +1,14 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import envFilePath from '../envs/env';
 import * as Joi from 'joi';
 import { commonConstants } from './global/constants/common.constants';
+import { dataSourceOptions } from './config/typeorm.config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { JwtMiddleware } from './domain/jwt/middlewares/jwt.middleware';
+import { JwtModule } from './domain/jwt/jwt.module';
 
 @Module({
   imports: [
@@ -16,13 +20,6 @@ import { commonConstants } from './global/constants/common.constants';
           .valid(...commonConstants.props.NODE_ENV_ARRAY)
           .required(),
         TZ: Joi.string().valid('Asia/Seoul').required(),
-        // PORT: Joi.number().required(),
-        // DB_HOST: Joi.string().required(),
-        // DB_PORT: Joi.number().required(),
-        // DB_NAME: Joi.string().required(),
-        // DB_USERNAME: Joi.string().required(),
-        // DB_PASSWORD: Joi.string().required(),
-        // DB_SCHEMA: Joi.string().required(),
         /**
          * TODO: JWT, AWS_URL, AWS_SECRET
          *         DB_SSL: Joi.string().required(),
@@ -36,6 +33,10 @@ import { commonConstants } from './global/constants/common.constants';
          */
       }),
     }),
+    TypeOrmModule.forRoot(dataSourceOptions),
+    JwtModule.forRoot({
+      jwtSecret: process.env.JWT_SECRET,
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],
@@ -43,7 +44,7 @@ import { commonConstants } from './global/constants/common.constants';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): any {
     consumer
-      // .apply(JwtMiddleware)
-      // .forRoutes({ path: '*', method: RequestMethod.ALL });
+      .apply(JwtMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
   }
 }
