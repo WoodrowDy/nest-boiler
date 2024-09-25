@@ -9,7 +9,7 @@ export class CustomDbLogger implements TypeORMLogger {
     private loggerSlow: Logger = new Logger('QUERY_SLOW');
 
     logQuery(query: string, parameters: any[] = []) {
-        if (process.env.NODE_ENV === 'dev') {
+        if (process.env.NODE_ENV === 'local') {
             this.loggerLog.log(`${query}, ${parameters}`);
         }
     }
