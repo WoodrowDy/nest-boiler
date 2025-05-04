@@ -1,14 +1,14 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import * as bodyParser from 'body-parser';
-import helmet from 'helmet';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
-import { join } from 'path';
-import { commonConstants } from './global/constants/common.constants';
-import { swaggerConstants } from './global/constants/swagger.constants';
-import basicAuth from 'express-basic-auth';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "./app.module";
+import { NestExpressApplication } from "@nestjs/platform-express";
+import * as bodyParser from "body-parser";
+import helmet from "helmet";
+import { ValidationPipe, VersioningType } from "@nestjs/common";
+import { join } from "path";
+import { commonConstants } from "./global/constants/common.constants";
+import { swaggerConstants } from "./global/constants/swagger.constants";
+import basicAuth from "express-basic-auth";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {});
@@ -22,8 +22,8 @@ async function bootstrap() {
   app.enableCors({
     credentials: true,
     exposedHeaders: [
-      'Authorization',
-      'Content-Disposition', //파일 다운로드 시, 프론트에서 파일명 읽을 수 있도록
+      "Authorization",
+      "Content-Disposition", //파일 다운로드 시, 프론트에서 파일명 읽을 수 있도록
     ],
   });
 
@@ -32,7 +32,7 @@ async function bootstrap() {
    */
   app.use(
     bodyParser.urlencoded({
-      limit: '50mb', //maximum request body size, default = 100kb
+      limit: "50mb", //maximum request body size, default = 100kb
       extended: true, // for any value types. not only string or Array
     }),
   );
@@ -83,16 +83,16 @@ async function bootstrap() {
   /**
    * 소셜 로그인 관련 페이지 띄워줄 수 있는 루트 패스를 위해
    */
-  const rootPath = join(__dirname, '..', '..', 'public');
+  const rootPath = join(__dirname, "..", "..", "public");
   app.useStaticAssets(rootPath);
-  app.setViewEngine('html');
+  app.setViewEngine("html");
 
   /**
    * 서버에서 view 파일로 필요한 부분을 처리 하기 위해
    */
-  const viewBasePath = join(__dirname, '..', '..', 'views');
+  const viewBasePath = join(__dirname, "..", "..", "views");
   app.setBaseViewsDir(viewBasePath);
-  app.setViewEngine('hbs');
+  app.setViewEngine("hbs");
 
   /**
    * swagger
@@ -104,8 +104,7 @@ async function bootstrap() {
       basicAuth({
         challenge: true,
         users: {
-          [swaggerConstants.props.SWAGGER_USER]:
-          swaggerConstants.props.SWAGGER_PASSWORD,
+          [swaggerConstants.props.SWAGGER_USER]: swaggerConstants.props.SWAGGER_PASSWORD,
         },
       }),
     );
@@ -116,7 +115,7 @@ async function bootstrap() {
     .setDescription(swaggerConstants.props.SWAGGER_DESCRIPTION)
     .setVersion(swaggerConstants.props.SWAGGER_VERSION)
     .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'jwt' },
+      { type: "http", scheme: "bearer", bearerFormat: "jwt" },
       swaggerConstants.auth.BEARER_TOKEN,
     )
     .build();
@@ -127,27 +126,22 @@ async function bootstrap() {
       swaggerOptions: {
         persistAuthorization: true,
         filter: true,
-        docExpansion: 'none',
-        tagsSorter: 'alpha',
+        docExpansion: "none",
+        tagsSorter: "alpha",
       },
     };
 
   const cspOptions = {
     directives: {
       ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      'script-src': [
+      "script-src": [
         "'self'",
         "'unsafe-inline'",
         "'unsafe-eval'",
         // "'*.server-domain.com'", TODO:서버 도메인 설정
       ],
-      'form-action': [
-        "'self'",
-        '*.checkplus.co.kr',
-        "'unsafe-inline'",
-        "'unsafe-eval'",
-      ],
-      'base-uri': ['/', 'http:'],
+      "form-action": ["'self'", "*.checkplus.co.kr", "'unsafe-inline'", "'unsafe-eval'"],
+      "base-uri": ["/", "http:"],
     },
   };
 
@@ -163,15 +157,18 @@ async function bootstrap() {
     }),
   ); // Always apply helmet after Swagger! https://dev.to/starlingroot/helmetjs-and-swaggerui-avoiding-headaches-in-your-nodejs-app-29l3
 
-  await app.listen(port, '0.0.0.0', function () {
-    if (typeof process.send === 'function') {
-      process.send('ready');
+  await app.listen(port, "0.0.0.0", function () {
+    if (typeof process.send === "function") {
+      process.send("ready");
     }
   });
 
-  process.on('SIGINT', function () {
+  console.log(`Server running on port:${port}, env:${env}, timezone:${timezone}`);
+
+  process.on("SIGINT", function () {
     // SIGINT: Interrupt from keyboard(such as Ctrl C)
     process.exit();
   });
 }
+
 bootstrap();

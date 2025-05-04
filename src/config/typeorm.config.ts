@@ -1,11 +1,11 @@
-import { DataSource, DataSourceOptions } from 'typeorm';
-import { config } from 'dotenv';
-import envFilePAth from '../../envs/env';
+import { DataSource, DataSourceOptions } from "typeorm";
+import { config } from "dotenv";
+import envFilePAth from "../../envs/env";
 
-config({path:envFilePAth});
+config({ path: envFilePAth });
 
 export const dataSourceOptions: DataSourceOptions = {
-  type: 'postgres',
+  type: "postgres",
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT),
   database: process.env.DB_NAME,
@@ -14,12 +14,11 @@ export const dataSourceOptions: DataSourceOptions = {
   schema: process.env.DB_SCHEMA,
   logging: false,
   synchronize: false,
-  entities: [__dirname + '/../../**/*.entity.{js,ts}'],
-  migrations: ['/../database/migrations/*.ts'],
-  migrationsTableName: 'migrations',
-}
+  entities: [__dirname + "/../../**/*.entity.{js,ts}"],
+  migrations: ["/../database/migrations/*.ts"],
+  migrationsTableName: "migrations",
+};
 
 const dataSource = new DataSource(dataSourceOptions);
 
 export default dataSource;
-

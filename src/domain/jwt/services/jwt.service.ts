@@ -1,8 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { JwtConfigOptionsDto } from '../dtos/jwt-config-option.dto';
-import { constants } from '../jwt.constants';
-import * as jwt from 'jsonwebtoken';
-import { JswSignInOptionsDto } from '../dtos/jwt-signin-option.dto';
+import { Inject, Injectable } from "@nestjs/common";
+import { JwtConfigOptionsDto } from "../dtos/jwt-config-option.dto";
+import { constants } from "../jwt.constants";
+import * as jwt from "jsonwebtoken";
+import { JswSignInOptionsDto } from "../dtos/jwt-signin-option.dto";
 
 @Injectable()
 export class JwtService {

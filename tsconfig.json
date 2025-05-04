@@ -19,6 +19,12 @@
     "noFallthroughCasesInSwitch": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
-  }
+    "moduleResolution": "node"
+  },
+  "include": [
+    "src/**/*",
+    ".eslintrc.js", // ESLint 설정 파일 추가
+    "test/**/*"
+  ],
+  "exclude": ["node_modules"]
 }

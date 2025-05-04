@@ -1,14 +1,14 @@
-import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { ConfigModule } from '@nestjs/config';
-import envFilePath from '../envs/env';
-import * as Joi from 'joi';
-import { commonConstants } from './global/constants/common.constants';
-import { dataSourceOptions } from './config/typeorm.config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtMiddleware } from './domain/jwt/middlewares/jwt.middleware';
-import { JwtModule } from './domain/jwt/jwt.module';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
+import { AppController } from "./app.controller";
+import { AppService } from "./app.service";
+import { ConfigModule } from "@nestjs/config";
+import envFilePath from "../envs/env";
+import * as Joi from "joi";
+import { commonConstants } from "./global/constants/common.constants";
+import { dataSourceOptions } from "./config/typeorm.config";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { JwtMiddleware } from "./domain/jwt/middlewares/jwt.middleware";
+import { JwtModule } from "./domain/jwt/jwt.module";
 
 @Module({
   imports: [
@@ -19,7 +19,7 @@ import { JwtModule } from './domain/jwt/jwt.module';
         NODE_ENV: Joi.string()
           .valid(...commonConstants.props.NODE_ENV_ARRAY)
           .required(),
-        TZ: Joi.string().valid('Asia/Seoul').required(),
+        TZ: Joi.string().valid("Asia/Seoul").required(),
         /**
          * TODO: JWT, AWS_URL, AWS_SECRET
          *         DB_SSL: Joi.string().required(),
@@ -43,8 +43,6 @@ import { JwtModule } from './domain/jwt/jwt.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): any {
-    consumer
-      .apply(JwtMiddleware)
-      .forRoutes({ path: '*', method: RequestMethod.ALL });
+    consumer.apply(JwtMiddleware).forRoutes({ path: "*", method: RequestMethod.ALL });
   }
 }
