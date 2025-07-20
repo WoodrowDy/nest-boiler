@@ -30,5 +30,5 @@ export const PaginatedQuery = createParamDecorator(
         required: false,
       })(target, key, Object.getOwnPropertyDescriptor(target, key));
     },
-  ],
+  ]
 );

@@ -9,16 +9,16 @@ import { Pagination } from "../../../../global/decorators/pagination-query.decor
 export class StaticBoardService {
   constructor(
     private staticBoardRepository: StaticBoardRepository,
-    private dataSource: DataSource,
+    private dataSource: DataSource
   ) {}
 
   async generateStaticBoard(
     generateStaticBoardDto: GenerateStaticBoardDto,
-    transactionManager?: EntityManager,
+    transactionManager?: EntityManager
   ) {
     return await this.staticBoardRepository.createStaticBoard(
       generateStaticBoardDto,
-      transactionManager,
+      transactionManager
     );
   }
 
@@ -29,12 +29,12 @@ export class StaticBoardService {
   async getStaticBoardListAndCount(
     getStaticBoardDto: GetStaticBoardDto,
     pagination: Pagination,
-    transactionManager?: EntityManager,
+    transactionManager?: EntityManager
   ) {
     return await this.staticBoardRepository.findStaticBoardListAndCount(
       getStaticBoardDto,
       pagination,
-      transactionManager,
+      transactionManager
     );
   }
 }

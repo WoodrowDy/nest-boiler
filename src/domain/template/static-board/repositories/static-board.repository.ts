@@ -13,7 +13,7 @@ export class StaticBoardRepository extends Repository<StaticBoard> {
 
   async createStaticBoard(
     generateStaticBoardDto: GenerateStaticBoardDto,
-    transactionManager?: EntityManager,
+    transactionManager?: EntityManager
   ): Promise<StaticBoard> {
     try {
       let result = null;
@@ -33,7 +33,7 @@ export class StaticBoardRepository extends Repository<StaticBoard> {
 
   async findStaticBoard(
     getStaticBoardDto: GetStaticBoardDto,
-    transactionManager?: EntityManager,
+    transactionManager?: EntityManager
   ): Promise<StaticBoard> {
     const query = this.buildFindQuery(getStaticBoardDto, transactionManager);
 
@@ -49,7 +49,7 @@ export class StaticBoardRepository extends Repository<StaticBoard> {
   async findStaticBoardListAndCount(
     getStaticBoardDto: GetStaticBoardDto,
     pagination: Pagination,
-    transactionManager?: EntityManager,
+    transactionManager?: EntityManager
   ): Promise<{ list: StaticBoard[]; count: number }> {
     const query = this.buildFindQuery(getStaticBoardDto, transactionManager);
 
@@ -75,7 +75,7 @@ export class StaticBoardRepository extends Repository<StaticBoard> {
 
   private buildFindQuery(
     getStaticBoardDto: GetStaticBoardDto,
-    transactionManager?: EntityManager,
+    transactionManager?: EntityManager
   ): SelectQueryBuilder<StaticBoard> {
     const { id, category, writerLike } = getStaticBoardDto;
 

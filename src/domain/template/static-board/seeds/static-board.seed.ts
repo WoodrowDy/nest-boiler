@@ -18,7 +18,7 @@ export class StaticBoardSeeder implements Seeder {
           writer: "김작가",
           phone: "010-1234-5678",
         },
-        transactionManager,
+        transactionManager
       );
     });
 

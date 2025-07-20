@@ -8,7 +8,7 @@ import { JswSignInOptionsDto } from "../dtos/jwt-signin-option.dto";
 export class JwtService {
   constructor(
     @Inject(constants.injectionToken.JWT_CONFIG_OPTION)
-    private readonly jwtConfigOptionsDto: JwtConfigOptionsDto,
+    private readonly jwtConfigOptionsDto: JwtConfigOptionsDto
   ) {}
 
   sign(payload: object, options?: JswSignInOptionsDto): string {

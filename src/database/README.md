@@ -87,21 +87,18 @@ pnpm run migration:create
 ```typescript
 // src/domain/static-board/seeds/static-board.seed.ts
 export class StaticBoardSeeder implements Seeder {
-  public async run(
-    dataSource: DataSource,
-    factoryManager: SeederFactoryManager,
-  ) {
+  public async run(dataSource: DataSource, factoryManager: SeederFactoryManager) {
     const repository = new StaticBoardRepository(dataSource);
 
     // 필수 데이터 생성
     await repository.createStaticBoard({
-      category: '공지사항',
-      writer: '관리자',
+      category: "공지사항",
+      writer: "관리자",
       // ... 데이터
     });
 
     // 개발 환경에서만 더미 데이터 생성
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== "production") {
       const factory = factoryManager.get(StaticBoard);
       await factory.saveMany(10);
     }
@@ -114,11 +111,8 @@ export class StaticBoardSeeder implements Seeder {
 ```typescript
 // src/database/seeds/main.seed.ts
 export class MainSeeder implements Seeder {
-  public async run(
-    dataSource: DataSource,
-    factoryManager: SeederFactoryManager,
-  ) {
-    console.log('🌱 Starting seeding process...');
+  public async run(dataSource: DataSource, factoryManager: SeederFactoryManager) {
+    console.log("🌱 Starting seeding process...");
 
     // 도메인별 시드들을 순서대로 실행
     const staticBoardSeeder = new StaticBoardSeeder();
@@ -126,7 +120,7 @@ export class MainSeeder implements Seeder {
 
     // 추가 도메인 시드들...
 
-    console.log('✅ All seeding completed!');
+    console.log("✅ All seeding completed!");
   }
 }
 ```
@@ -338,6 +332,3 @@ pnpm run setup-db             # 전체 환경 구축
 ### 2.3. 한번에 적용하고 싶다면, npm run setup-db
 
 ### 3-1. npm run start:${env} -->
-
-
-

@@ -55,8 +55,11 @@ async function bootstrap() {
    */
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // When set to true, this will automatically remove non-whitelisted properties (those without any decorator in the validation class).
-      transform: true, // Automatically transform payloads to be objects typed according to their DTO classes.
+      // When set to true, this will automatically remove non-whitelisted properties
+      // (those without any decorator in the validation class).
+      whitelist: true,
+      // Automatically transform payloads to be objects typed according to their DTO classes.
+      transform: true,
     }),
   );
 
@@ -121,7 +124,7 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup(swaggerConstants.props.SWAGGER_PATH, app, document),
+  (SwaggerModule.setup(swaggerConstants.props.SWAGGER_PATH, app, document),
     {
       swaggerOptions: {
         persistAuthorization: true,
@@ -129,7 +132,7 @@ async function bootstrap() {
         docExpansion: "none",
         tagsSorter: "alpha",
       },
-    };
+    });
 
   const cspOptions = {
     directives: {
