@@ -11,4 +11,4 @@ import { StaticBoardController } from "./controllers/static-board.controller";
   controllers: [StaticBoardController],
   exports: [],
 })
-export class staticBoardModule {}
+export class StaticBoardModule {}

@@ -5,10 +5,11 @@ import { ConfigModule } from "@nestjs/config";
 import envFilePath from "../envs/env";
 import * as Joi from "joi";
 import { commonConstants } from "./global/constants/common.constants";
-import { dataSourceOptions } from "./config/typeorm.config";
+import { AppDataSource } from "./database/config/typeorm.config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { JwtMiddleware } from "./domain/jwt/middlewares/jwt.middleware";
 import { JwtModule } from "./domain/jwt/jwt.module";
+import { StaticBoardModule } from "./domain/template/static-board/static-board.module";
 
 @Module({
   imports: [
@@ -33,10 +34,12 @@ import { JwtModule } from "./domain/jwt/jwt.module";
          */
       }),
     }),
-    TypeOrmModule.forRoot(dataSourceOptions),
+    TypeOrmModule.forRoot(AppDataSource.options),
     JwtModule.forRoot({
       jwtSecret: process.env.JWT_SECRET,
     }),
+    //Templates
+    StaticBoardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

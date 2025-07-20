@@ -1,16 +1,15 @@
 import { BeforeInsert, BeforeUpdate, Column, Entity, Index } from "typeorm";
 import { ApiProperty } from "@nestjs/swagger";
-
 import { Transform } from "class-transformer";
-import { CoreSoftEntity } from "../../../../global/entities/core-soft.entity";
+import { CoreSoftEntity } from "src/database/entities/core-soft.entity";
 import {
   IsCustomBoolean,
   IsCustomDate,
   IsCustomMatches,
   IsCustomString,
-} from "../../../../global/decorators/dto.decorator";
-import { transformStringToDate } from "../../../../global/helpers/date.helper";
-import { regexConstants } from "../../../../global/constants/regex.constants";
+} from "src/global/decorators/dto.decorator";
+import { transformStringToDate } from "src/global/helpers/date.helper";
+import { regexConstants } from "src/global/constants/regex.constants";
 
 @Entity({
   name: "StaticBoard",

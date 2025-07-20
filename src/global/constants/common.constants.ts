@@ -13,12 +13,12 @@ export const commonConstants = {
   },
   errorMessages: {},
 
-  defaultQuery: {
-    PAGE: 1,
-    PAGE_SIZE: 10,
-    MAX_PAGE_SIZE: 1000,
-    ORDER_KEY: "createdAt",
-    ORDER_VALUE: "DESC",
-  },
+  // defaultQuery: {
+  //   PAGE: 1,
+  //   PAGE_SIZE: 10,
+  //   MAX_PAGE_SIZE: 1000,
+  //   ORDER_KEY: "createdAt",
+  //   ORDER_VALUE: "DESC",
+  // },
   injectionToken: {},
 };

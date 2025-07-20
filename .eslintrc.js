@@ -9,8 +9,9 @@ module.exports = {
   env: {
     browser: true,
     node: true,
+    jest: true,
   },
-  extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended", "prettier"],
+  extends: ["plugin:@typescript-eslint/recommended", "plugin:prettier/recommended"],
   plugins: ["@typescript-eslint", "prettier"],
   rules: {
     "no-unused-vars": "off",
@@ -19,6 +20,7 @@ module.exports = {
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/interface-name-prefix": "off",
     "prettier/prettier": [
       "error",
       {
