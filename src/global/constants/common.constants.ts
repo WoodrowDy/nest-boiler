@@ -2,6 +2,7 @@ const nodeEnvs = {
   LOCAL: "local",
   DEV: "dev",
   PROD: "prod",
+  TEST: "test",
 } as const;
 
 const NODE_ENV_ARRAY: string[] = Object.values(nodeEnvs);
