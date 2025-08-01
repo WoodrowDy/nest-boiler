@@ -1,73 +1,106 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# backend-nestjs
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)](https://aws.amazon.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 소개
 
-## Description
+이 애플리케이션은 NestJS 기반의 백엔드 서버로, 효율적이고 확장성 있는 서버 애플리케이션을 구축하기 위해 설계되었습니다.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 프로젝트 구조
 
-## Installation
+- 본 프로젝트는 DDD 패턴을 참고하여, 도메인별로 디렉토리를 분리하여 관리합니다.
 
 ```bash
-$ npm install
+backend-nestjs/
+|-- src/
+|   |-- app.controller.ts
+|   |-- app.module.ts
+|   |-- app.service.ts
+|   |-- main.ts
+|   |-- database/
+|   |   |-- config/           # 데이터베이스 설정
+|   |   |-- entity/           # 공통 엔티티
+|   |   |-- migrations/       # 마이그레이션 파일
+|   |   |-- seeds/            # 시드 데이터
+|   |-- domain/
+|   |   |-- static-board/     # 예시 static-board 도메인
+|   |       |-- controllers/  # 컨트롤러
+|   |       |-- dtos/         # DTO
+|   |       |-- entities/     # 엔티티
+|   |       |-- repositories/ # 레포지토리
+|   |       |-- services/     # 서비스
+|   |       |-- seeds/        # 도메인별 시드
+|   |-- shared/               # 공통 모듈, 상수, 데코레이터 등
+|-- test/                     # 테스트 코드
+    |-- utils/                # 테스트 환경 변수 및 앱 실행 헬퍼 함수 등
+    |-- domain/
+        |-- fixture           # 실제 API 호출 함수 모음
+        |-- mocks             # 테스트용 목 데이터
+        |-- scenarios         # 실제 테스트 시나리오 코드
+|-- package.json
+|-- README.md
 ```
 
-## Running the app
+## 기술 스택
+
+- **언어**: TypeScript
+- **프레임워크**: NestJS
+- **데이터베이스**: PostgreSQL, TypeORM
+- **테스트**: Jest
+- **API 문서화**: Swagger
+- **배포/운영**: AWS
+
+## API 문서
+
+| 환경     | 바로가기                                                             |
+| -------- | -------------------------------------------------------------------- |
+| **로컬** | [Swagger (localhost)](http://localhost:3000/api-docs)                |
+| **개발** | [Swagger (dev)](https://dev-api.yourdomain.com/api-docs) (설정 필요) |
+| **운영** | [Swagger (prod)](https://api.yourdomain.com/api-docs) (설정 필요)    |
+
+## 설치 및 실행
 
 ```bash
-# development
-$ npm run start
+# 의존성 설치
+pnpm install
 
-# watch mode
-$ npm run start:dev
+# 개발 서버 실행
+pnpm run start:dev
 
-# production mode
-$ npm run start:prod
+# 프로덕션 빌드 및 실행
+pnpm run build
+pnpm run start:prod
 ```
 
-## Test
+## 테스트
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# 단위 테스트
+pnpm run test:local
 ```
 
-## Support
+## 환경 변수
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- 환경 변수는 `envs/` 디렉토리 및 `.env` 파일을 통해 관리합니다.
 
-## Stay in touch
+## 마이그레이션 및 시드
 
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- TypeORM 마이그레이션 및 시드 데이터는 `src/database/migrations/`, `src/database/seeds/`에서 관리합니다.
+- 자세한 사용법은 `src/database/README.md`를 참고하세요.
 
-## License
+## 코딩 컨벤션
 
-Nest is [MIT licensed](LICENSE).
+- 클래스: UpperCamelCase
+- 메서드/변수: lowerCamelCase
+- 상수: UPPER_SNAKE_CASE
+- 디렉토리/파일: 소문자, 하이픈(-) 구분
+
+## 예외 처리
+
+- NestJS의 Exception Filter를 활용하여 일관된 예외 처리를 구현합니다.
+- 커스텀 예외 및 에러 코드는 `shared/` 디렉토리에서 관리합니다.
+
+---
