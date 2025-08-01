@@ -80,6 +80,12 @@ pnpm run start:prod
 ```bash
 # 단위 테스트
 pnpm run test:local
+
+# e2e 테스트
+pnpm run test:e2e
+
+# 커버리지
+pnpm run test:cov
 ```
 
 ## 환경 변수
