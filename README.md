@@ -109,4 +109,27 @@ pnpm run test:cov
 - NestJS의 Exception Filter를 활용하여 일관된 예외 처리를 구현합니다.
 - 커스텀 예외 및 에러 코드는 `shared/` 디렉토리에서 관리합니다.
 
+## Git Hooks (Husky)
+
+이 프로젝트는 코드 품질 관리를 위해 Husky를 사용합니다:
+
+### Pre-commit Hook
+- **실행 시점**: 커밋 전 자동 실행
+- **실행 내용**: 
+  - ESLint로 코드 검사 및 자동 수정
+  - Prettier로 코드 포맷팅
+- **대상 파일**: staged된 TypeScript/JavaScript 파일만
+
+### Pre-push Hook
+- **실행 시점**: 푸시 전 자동 실행  
+- **실행 내용**: E2E 테스트 (`pnpm run test:local`)
+- **목적**: 테스트를 통과한 코드만 원격 저장소에 푸시
+
+```bash
+# Git hooks는 자동으로 실행됩니다
+git add .
+git commit -m "your message"  # 자동으로 lint + format 실행
+git push                       # 자동으로 테스트 실행
+```
+
 ---
