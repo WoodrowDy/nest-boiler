@@ -2,6 +2,10 @@ import { StaticBoard } from "../../entities/static-board.entity";
 import { PickType } from "@nestjs/swagger";
 
 export class StaticBoardDto extends PickType(StaticBoard, [
+  "id",
+  "createdAt",
+  "updatedAt",
+  "deletedAt",
   "category",
   "writer",
   "birth",
@@ -21,6 +25,10 @@ export class StaticBoardDto extends PickType(StaticBoard, [
    */
   static of(entity: StaticBoard): StaticBoardDto {
     const dto = new StaticBoardDto();
+    dto.id = entity.id;
+    dto.createdAt = entity.createdAt;
+    dto.updatedAt = entity.updatedAt;
+    dto.deletedAt = entity.deletedAt;
     dto.category = entity.category;
     dto.writer = entity.writer;
     dto.birth = entity.birth;

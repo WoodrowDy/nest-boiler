@@ -131,7 +131,7 @@
     "coverageDirectory": "./coverage",
     "testEnvironment": "node",
     "setupFilesAfterEnv": [
-      "<rootDir>/test/setup/jest.setup.ts"
+      "<rootDir>/test/utils/e2e-setup.ts"
     ]
   }
 }

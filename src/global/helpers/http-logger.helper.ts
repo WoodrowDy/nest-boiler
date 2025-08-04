@@ -29,8 +29,7 @@ export const requestLoggerHelper = function (
         oldPassword: body.oldPassword ? "***" : undefined,
       },
     },
-    null,
-    0
+    null
   );
   // TODO headers의 authorization을 로그 시 '***' 처리할 지 고민 중
   const stringifiedReqHeaders = JSON.stringify({ reqHeaders: headers }, null, 0);

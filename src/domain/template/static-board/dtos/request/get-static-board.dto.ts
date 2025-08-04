@@ -5,6 +5,7 @@ import { IsOptional, IsString } from "class-validator";
 export class GetStaticBoardDto extends PartialType(PickType(StaticBoard, ["id", "category"])) {
   @ApiProperty({
     description: "writer Like search",
+    required: false,
   })
   @IsString()
   @IsOptional()
