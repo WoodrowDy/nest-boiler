@@ -18,7 +18,9 @@ export const requestLoggerHelper = function (
   let decodedUrl = url;
   try {
     decodedUrl = decodeURI(url);
-  } catch (e) {}
+  } catch (e) {
+    console.log(e);
+  }
   const stringifiedReqBody = JSON.stringify(
     {
       reqBody: {
@@ -36,6 +38,7 @@ export const requestLoggerHelper = function (
   const stringifiedParsedUserAgent = JSON.stringify({ parsedUserAgent }, null, 0);
   req["parsedUserAgent"] = parsedUserAgent;
 
+  // eslint-disable-next-line max-len
   const loggingMessage = `[${method}]${decodedUrl} | ${stringifiedReqBody} | ${stringifiedReqHeaders} | ${stringifiedParsedUserAgent}`;
   loggingContext = loggingContext || "HTTP REQ";
 
@@ -55,7 +58,9 @@ export const responseLoggerHelper = function (
   let decodedUrl = url;
   try {
     decodedUrl = decodeURI(url);
-  } catch (e) {}
+  } catch (e) {
+    console.log(e);
+  }
   const stringifiedReqBody = JSON.stringify(
     {
       reqBody: {
@@ -76,6 +81,7 @@ export const responseLoggerHelper = function (
     0
   );
 
+  // eslint-disable-next-line max-len
   const loggingMessage = `[${method}]${decodedUrl} | ${stringifiedResData} | ${stringifiedReqBody} | ${stringifiedReqHeaders} | ${stringifiedParsedUserAgent}`;
   loggingContext = loggingContext || `HTTP RES ${statusCode}`;
 

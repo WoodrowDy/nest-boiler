@@ -1,7 +1,7 @@
-import { launchAppAndGetTestAppAndDb } from 'test/utils/e2e-helper';
-import { StaticBoardFixture } from 'test/domain/static-board/fixtures/static-board.fixture';
-import { generateStaticBoardMockDto } from '../mocks/static-board.mock';
-import { HttpStatus } from '@nestjs/common';
+import { launchAppAndGetTestAppAndDb } from "test/utils/e2e-helper";
+import { StaticBoardFixture } from "test/domain/static-board/fixtures/static-board.fixture";
+import { generateStaticBoardMockDto } from "../mocks/static-board.mock";
+import { HttpStatus } from "@nestjs/common";
 
 describe(`static board test (e2e)`, () => {
   let app;
@@ -14,10 +14,7 @@ describe(`static board test (e2e)`, () => {
   });
 
   it(`테스트 게시판을 생성 할 수 있다`, async () => {
-    const result = await StaticBoardFixture.generateStaticBoard(
-      app,
-      generateStaticBoardMockDto,
-    );
+    const result = await StaticBoardFixture.generateStaticBoard(app, generateStaticBoardMockDto);
 
     console.log(result.body);
     console.log(result.status);

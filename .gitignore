@@ -44,6 +44,7 @@ envs/.env.prod
 # claude files
 CLAUDE.md
 
+
 # temp directory
 .temp
 .tmp
