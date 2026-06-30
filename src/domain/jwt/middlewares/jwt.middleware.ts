@@ -11,13 +11,13 @@ export class JwtMiddleware implements NestMiddleware {
     const { headers } = req;
     const authorization = headers[constants.props.AUTHORIZATION] as string;
 
-    if (authorization && authorization.substring(0, 7) === "Bearer ") {
+    if (authorization && authorization.slice(0, 7) === "Bearer ") {
       try {
         const jwtToken = authorization.replace("Bearer ", "");
         const sessionDto = this.jwtService.verify(jwtToken);
 
         req["session"] = sessionDto;
-      } catch (e) {
+      } catch {
         throw new ForbiddenException({
           statusCode: 403,
           message: constants.errorMessages.JWT_INVALID_TOKEN.ko,

@@ -13,8 +13,8 @@ export const PaginatedQuery = createParamDecorator(
   (data: unknown, context: ExecutionContext): Pagination => {
     const req = context.switchToHttp().getRequest();
     return {
-      page: parseInt(req.query.page, 10) || DEFAULT_PAGE,
-      pageSize: parseInt(req.query.pageSize, 10) || DEFAULT_PAGE_SIZE,
+      page: Number.parseInt(req.query.page, 10) || DEFAULT_PAGE,
+      pageSize: Number.parseInt(req.query.pageSize, 10) || DEFAULT_PAGE_SIZE,
     };
   },
   [

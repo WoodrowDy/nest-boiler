@@ -4,7 +4,7 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import * as bodyParser from "body-parser";
 import helmet from "helmet";
 import { ValidationPipe, VersioningType } from "@nestjs/common";
-import { join } from "path";
+import { join } from "node:path";
 import { commonConstants } from "./global/constants/common.constants";
 import { swaggerConstants } from "./global/constants/swagger.constants";
 import basicAuth from "express-basic-auth";
@@ -12,7 +12,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {});
-  const port = parseInt(process.env.PORT, 10);
+  const port = Number.parseInt(process.env.PORT, 10);
   const env = process.env.NODE_ENV;
   const timezone = process.env.TZ;
 
@@ -34,16 +34,18 @@ async function bootstrap() {
     bodyParser.urlencoded({
       limit: "50mb", //maximum request body size, default = 100kb
       extended: true, // for any value types. not only string or Array
-    }),
+    })
   );
 
   /**
    * use custom logger
    */
   // const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
-  // by using this pattern, we instruct Nest to use the same singleton instance of WINSTON_MODULE_NEST_PROVIDER
+  // by using this pattern, we instruct Nest to use the same singleton
+  // instance of WINSTON_MODULE_NEST_PROVIDER
   // app.useLogger(logger);
-  // when instantiating Logger(from '@nestjs/common') class, Nest will use WINSTON_MODULE_NEST_PROVIDER internally
+  // when instantiating Logger(from '@nestjs/common') class, Nest will
+  // use WINSTON_MODULE_NEST_PROVIDER internally
 
   /**
    * GlobalInterceptors
@@ -60,7 +62,7 @@ async function bootstrap() {
       whitelist: true,
       // Automatically transform payloads to be objects typed according to their DTO classes.
       transform: true,
-    }),
+    })
   );
 
   /**
@@ -109,7 +111,7 @@ async function bootstrap() {
         users: {
           [swaggerConstants.props.SWAGGER_USER]: swaggerConstants.props.SWAGGER_PASSWORD,
         },
-      }),
+      })
     );
   }
 
@@ -119,20 +121,19 @@ async function bootstrap() {
     .setVersion(swaggerConstants.props.SWAGGER_VERSION)
     .addBearerAuth(
       { type: "http", scheme: "bearer", bearerFormat: "jwt" },
-      swaggerConstants.auth.BEARER_TOKEN,
+      swaggerConstants.auth.BEARER_TOKEN
     )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  (SwaggerModule.setup(swaggerConstants.props.SWAGGER_PATH, app, document),
-    {
-      swaggerOptions: {
-        persistAuthorization: true,
-        filter: true,
-        docExpansion: "none",
-        tagsSorter: "alpha",
-      },
-    });
+  SwaggerModule.setup(swaggerConstants.props.SWAGGER_PATH, app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      filter: true,
+      docExpansion: "none",
+      tagsSorter: "alpha",
+    },
+  });
 
   const cspOptions = {
     directives: {
@@ -157,7 +158,7 @@ async function bootstrap() {
       contentSecurityPolicy: cspOptions,
       crossOriginOpenerPolicy: false,
       crossOriginResourcePolicy: false,
-    }),
+    })
   ); // Always apply helmet after Swagger! https://dev.to/starlingroot/helmetjs-and-swaggerui-avoiding-headaches-in-your-nodejs-app-29l3
 
   await app.listen(port, "0.0.0.0", function () {

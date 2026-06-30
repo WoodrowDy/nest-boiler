@@ -1,7 +1,7 @@
 import { DataSource, DataSourceOptions } from "typeorm";
 import { config } from "dotenv";
 import envFilePath from "envs/env";
-import * as path from "path";
+import * as path from "node:path";
 import { SeederOptions } from "typeorm-extension";
 
 config({ path: envFilePath });
@@ -9,7 +9,7 @@ config({ path: envFilePath });
 export const dataSourceOptions: DataSourceOptions = {
   type: "postgres",
   host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT),
+  port: Number.parseInt(process.env.DB_PORT),
   database: process.env.DB_NAME,
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,

@@ -30,10 +30,10 @@ export class CustomDbLogger implements TypeORMLogger {
   }
 
   log(level: "log" | "info" | "warn", message: string) {
-    if (level !== "warn") {
-      this.loggerDBLog.log(`DB Log Level : ${level}, ${message}`);
-    } else {
+    if (level === "warn") {
       this.loggerDBLog.warn(`DB Log Level : ${level}, ${message}`);
+    } else {
+      this.loggerDBLog.log(`DB Log Level : ${level}, ${message}`);
     }
   }
 

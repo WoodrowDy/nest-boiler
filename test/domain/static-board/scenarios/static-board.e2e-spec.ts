@@ -5,12 +5,10 @@ import { HttpStatus } from "@nestjs/common";
 
 describe(`static board test (e2e)`, () => {
   let app;
-  let database;
 
   beforeAll(async () => {
     const launchResult = await launchAppAndGetTestAppAndDb();
     app = launchResult.app;
-    database = launchResult.dataSource;
   });
 
   it(`테스트 게시판을 생성 할 수 있다`, async () => {

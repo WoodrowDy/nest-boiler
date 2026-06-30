@@ -1,5 +1,5 @@
 import * as bcrypt from "bcryptjs";
-import { pbkdf2Sync, createCipheriv, createDecipheriv, createHash, createHmac } from "crypto";
+import { pbkdf2Sync, createCipheriv, createDecipheriv, createHash, createHmac } from "node:crypto";
 import * as CryptoJS from "crypto-js";
 
 export const bcryptHash = async function (string: string): Promise<string> {
@@ -20,8 +20,8 @@ export const singleSaltHash = function (string: string): string {
   const hashedString = pbkdf2Sync(
     string,
     process.env.SALT,
-    parseInt(process.env.ITERATIONS),
-    parseInt(process.env.KEYLEN),
+    Number.parseInt(process.env.ITERATIONS),
+    Number.parseInt(process.env.KEYLEN),
     process.env.DIGEST
   ).toString("base64");
 
@@ -124,8 +124,8 @@ function checkEncryptedString(
     const decryptedString = decryptValueWithCryptoOption(data, options);
     const reEncryptString = encryptValueWithCryptoOption(decryptedString, options);
     if (reEncryptString !== data) return false;
-  } catch (e) {
-    if (e.message !== "Malformed UTF-8 data") throw e;
+  } catch (error) {
+    if (error.message !== "Malformed UTF-8 data") throw error;
     return false;
   }
   return true;

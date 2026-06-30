@@ -59,8 +59,7 @@ export const IsCustomString = function (config: StringValidationConfig) {
   if (config.each === true) {
     decorators.push(IsString({ each: config.each }));
   } else {
-    decorators.push(IsString());
-    decorators.push(Length(config.minLength, config.maxLength));
+    decorators.push(IsString(), Length(config.minLength, config.maxLength));
   }
 
   return applyDecorators(...decorators);
@@ -73,13 +72,13 @@ export const IsCustomNumber = function (config: NumberValidationConfig) {
   else if (config.required === true) decorators.push(IsNotEmpty());
 
   if (config.each === true) {
-    decorators.push(IsNumber({}, { each: config.each }));
-    decorators.push(Min(config.minNumber, { each: config.each }));
-    decorators.push(Max(config.maxNumber, { each: config.each }));
+    decorators.push(
+      IsNumber({}, { each: config.each }),
+      Min(config.minNumber, { each: config.each }),
+      Max(config.maxNumber, { each: config.each })
+    );
   } else {
-    decorators.push(IsNumber());
-    decorators.push(Min(config.minNumber));
-    decorators.push(Max(config.maxNumber));
+    decorators.push(IsNumber(), Min(config.minNumber), Max(config.maxNumber));
   }
 
   return applyDecorators(...decorators);
@@ -172,13 +171,17 @@ export const IsCustomObject = function (config: ObjectValidationConfig) {
   else if (config.required === true) decorators.push(IsNotEmpty());
 
   if (config.each === true) {
-    decorators.push(IsObject({ each: config.each }));
-    decorators.push(ValidateNested({ each: config.each }));
-    decorators.push(Type(() => config.type));
+    decorators.push(
+      IsObject({ each: config.each }),
+      ValidateNested({ each: config.each }),
+      Type(() => config.type)
+    );
   } else {
-    decorators.push(IsObject());
-    decorators.push(ValidateNested());
-    decorators.push(Type(() => config.type));
+    decorators.push(
+      IsObject(),
+      ValidateNested(),
+      Type(() => config.type)
+    );
   }
 
   return applyDecorators(...decorators);

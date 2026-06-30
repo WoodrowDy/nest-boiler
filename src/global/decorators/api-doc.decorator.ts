@@ -110,43 +110,43 @@ export const ApiDoc = (options: ApiDocOptions) => {
   }
 
   return applyDecorators(...decorators);
+};
 
-  /**
-   * Swagger Error 스키마 등록시 예시입력을 위한 Helper
-   * @param description - 오류명
-   * @param examples - 오류객체 예시 객체정보
-   */
-  const createErrorResponseSchemaExamples = (
-    description: string,
-    examples: {
-      statusCode: number;
-      message: string;
-      error: string;
-    }
-  ) => {
-    return {
-      description,
-      schema: {
-        type: "object",
-        required: ["statusCode", "message", "error"],
-        properties: {
-          statusCode: {
-            type: "number",
-            description: "Http 응답코드",
-            example: examples.statusCode,
-          },
-          message: {
-            type: "string",
-            description: "오류 메시지",
-            example: examples.message,
-          },
-          error: {
-            type: "string",
-            description: "오류 코드",
-            example: examples.error,
-          },
+/**
+ * Swagger Error 스키마 등록시 예시입력을 위한 Helper
+ * @param description - 오류명
+ * @param examples - 오류객체 예시 객체정보
+ */
+export const createErrorResponseSchemaExamples = (
+  description: string,
+  examples: {
+    statusCode: number;
+    message: string;
+    error: string;
+  }
+) => {
+  return {
+    description,
+    schema: {
+      type: "object",
+      required: ["statusCode", "message", "error"],
+      properties: {
+        statusCode: {
+          type: "number",
+          description: "Http 응답코드",
+          example: examples.statusCode,
+        },
+        message: {
+          type: "string",
+          description: "오류 메시지",
+          example: examples.message,
+        },
+        error: {
+          type: "string",
+          description: "오류 코드",
+          example: examples.error,
         },
       },
-    };
+    },
   };
 };

@@ -42,19 +42,13 @@ export const ApiPropertyValidator = (options: ApiPropertyValidatorOption) => {
   } = options;
 
   //TODO 넘버 맥시멈 안먹음 확인 해보기
-  if (type === "number") {
-    if (!options.maximum) {
-      options.maximum = Number.MAX_SAFE_INTEGER;
-    }
+  if (type === "number" && !options.maximum) {
+    options.maximum = Number.MAX_SAFE_INTEGER;
   }
 
   let { isArray } = options;
 
-  if (isArray === true || isArray === false) {
-    isArray = isArray;
-  } else {
-    isArray = false;
-  }
+  isArray = isArray === true || isArray === false ? isArray : false;
 
   const decorators = [];
 
@@ -77,23 +71,25 @@ export const ApiPropertyValidator = (options: ApiPropertyValidatorOption) => {
     maxItems,
   });
 
-  decorators.push(apiProperty);
-
-  decorators.push(IsRequired(options));
+  decorators.push(apiProperty, IsRequired(options));
 
   switch (type) {
-    case "string":
+    case "string": {
       decorators.push(IsCustomString(options));
       break;
-    case "number":
+    }
+    case "number": {
       decorators.push(IsCustomNumber(options));
       break;
-    case "boolean":
+    }
+    case "boolean": {
       decorators.push(IsCustomBoolean(options));
       break;
-    case "date":
+    }
+    case "date": {
       decorators.push(IsCustomDate(options));
       break;
+    }
   }
 
   if (options.enum) {
@@ -109,12 +105,12 @@ export const ApiPropertyValidator = (options: ApiPropertyValidatorOption) => {
 
 function IsRequired(config: ApiPropertyValidatorOption) {
   return function (object: Record<string, unknown>, propertyName: string) {
-    if (!config.required) {
-      IsOptional()(object, propertyName);
-    } else {
+    if (config.required) {
       IsNotEmpty({
         message: (args: ValidationArguments) => `${config.name || args.property}은(는) 필수입니다.`,
       })(object, propertyName);
+    } else {
+      IsOptional()(object, propertyName);
     }
   };
 }

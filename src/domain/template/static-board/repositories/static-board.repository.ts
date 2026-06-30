@@ -19,15 +19,13 @@ export class StaticBoardRepository extends Repository<StaticBoard> {
       let result = null;
       const instance = this.create(generateStaticBoardDto);
 
-      if (transactionManager) {
-        result = await transactionManager.save(StaticBoard, instance);
-      } else {
-        result = await this.save(instance);
-      }
+      result = await (transactionManager
+        ? transactionManager.save(StaticBoard, instance)
+        : this.save(instance));
 
       return result;
-    } catch (e) {
-      throw e;
+    } catch (error) {
+      throw error;
     }
   }
 
@@ -79,13 +77,9 @@ export class StaticBoardRepository extends Repository<StaticBoard> {
   ): SelectQueryBuilder<StaticBoard> {
     const { id, category, writerLike } = getStaticBoardDto;
 
-    let query: SelectQueryBuilder<StaticBoard>;
-
-    if (transactionManager) {
-      query = transactionManager.createQueryBuilder(StaticBoard, `staticBoard`);
-    } else {
-      query = this.createQueryBuilder(`staticBoard`);
-    }
+    const query: SelectQueryBuilder<StaticBoard> = transactionManager
+      ? transactionManager.createQueryBuilder(StaticBoard, `staticBoard`)
+      : this.createQueryBuilder(`staticBoard`);
 
     if (id) {
       query.andWhere(`staticBoard.id = :id`, { id });

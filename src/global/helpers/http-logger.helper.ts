@@ -18,8 +18,8 @@ export const requestLoggerHelper = function (
   let decodedUrl = url;
   try {
     decodedUrl = decodeURI(url);
-  } catch (e) {
-    console.log(e);
+  } catch (error) {
+    console.log(error);
   }
   const stringifiedReqBody = JSON.stringify(
     {
@@ -57,8 +57,8 @@ export const responseLoggerHelper = function (
   let decodedUrl = url;
   try {
     decodedUrl = decodeURI(url);
-  } catch (e) {
-    console.log(e);
+  } catch (error) {
+    console.log(error);
   }
   const stringifiedReqBody = JSON.stringify(
     {
@@ -97,13 +97,16 @@ export const userAgentParser = function (req: Request): CommonParsedUserAgentDto
   const os = get(parsedUserAgent, "os.name") || null;
   const osVersion = get(parsedUserAgent, "os.version") || null;
   const browser = get(parsedUserAgent, "browser.name") || null;
-  const connectionType = mobileDetect.mobile()
-    ? ConnectionType.MOBILE
-    : mobileDetect.phone()
-      ? ConnectionType.PHONE
-      : mobileDetect.tablet()
-        ? ConnectionType.TABLET
-        : ConnectionType.WEB;
+  let connectionType: ConnectionType;
+  if (mobileDetect.mobile()) {
+    connectionType = ConnectionType.MOBILE;
+  } else if (mobileDetect.phone()) {
+    connectionType = ConnectionType.PHONE;
+  } else if (mobileDetect.tablet()) {
+    connectionType = ConnectionType.TABLET;
+  } else {
+    connectionType = ConnectionType.WEB;
+  }
   const device =
     [
       get(parsedUserAgent, "device.vendor"),

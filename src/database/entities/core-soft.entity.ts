@@ -1,4 +1,4 @@
-import { DeleteDateColumn, DataSource, EntityManager } from "typeorm";
+import { DeleteDateColumn } from "typeorm";
 import { ApiProperty } from "@nestjs/swagger";
 import { Expose } from "class-transformer";
 import { CoreHardEntity } from "./core-hard.entity";

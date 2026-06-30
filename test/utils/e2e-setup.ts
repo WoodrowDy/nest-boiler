@@ -1,5 +1,5 @@
 import * as dotenv from "dotenv";
-import * as path from "path";
+import * as path from "node:path";
 
 // .env.test 파일 로드
 dotenv.config({
