@@ -1,0 +1,29 @@
+# 로컬 개발/테스트용 Postgres
+# 사용: pnpm db:up / pnpm db:down / pnpm db:reset
+# 기본값은 envs/.env.test / envs/.env.local 과 일치하도록 맞춰져 있으며,
+# 셸 환경변수(POSTGRES_*)로 override 가능합니다.
+services:
+  postgres:
+    image: "postgres:16-alpine"
+    container_name: "nest-boiler-postgres"
+    ports:
+      # host:container — 시스템 Postgres(5432)와 충돌 방지를 위해 host는 5433 사용
+      - "${POSTGRES_PORT:-5433}:5432"
+    environment:
+      TZ: "${POSTGRES_TIMEZONE:-Asia/Seoul}"
+      POSTGRES_USER: "${POSTGRES_USER:-user}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-password}"
+      # 기본 생성 DB(테스트용). 로컬 개발용 DB는 init 스크립트에서 추가 생성
+      POSTGRES_DB: "${POSTGRES_DB:-nest-boiler-test}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rowdy} -d ${POSTGRES_DB:-nest-boiler-test}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - nest_boiler_postgres_data:/var/lib/postgresql/data
+      # 최초 기동 시 추가 DB(nest-boiler) 생성
+      - ./scripts/postgres:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  nest_boiler_postgres_data:

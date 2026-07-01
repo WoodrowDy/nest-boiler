@@ -40,6 +40,7 @@ lerna-debug.log*
 envs/.env.local
 envs/.env.dev
 envs/.env.prod
+envs/.env.docker
 
 # claude files
 CLAUDE.md
@@ -58,3 +59,5 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+# 내부 메모 문서 (커밋 제외)
+docs/

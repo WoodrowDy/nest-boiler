@@ -1,4 +1,5 @@
 import { PartialType } from "@nestjs/swagger";
-import { GenerateStaticBoardDto } from "./generate-static-board.dto";
+import { GenerateStaticBoardPayload } from "./generate-static-board.dto";
 
-export class ModifyStaticBoardDto extends PartialType(GenerateStaticBoardDto) {}
+/** 수정 요청 payload — 생성 payload의 부분집합(모든 필드 optional). */
+export class ModifyStaticBoardPayload extends PartialType(GenerateStaticBoardPayload) {}

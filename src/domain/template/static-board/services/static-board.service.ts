@@ -1,53 +1,43 @@
 import { Injectable } from "@nestjs/common";
+import { EntityManager } from "typeorm";
 import { StaticBoardRepository } from "../repositories/static-board.repository";
-import { DataSource, EntityManager } from "typeorm";
-import { GenerateStaticBoardDto } from "../dtos/request/generate-static-board.dto";
-import { GetStaticBoardDto } from "../dtos/request/get-static-board.dto";
-import { Pagination } from "../../../../global/decorators/pagination-query.decorator";
-import { StaticBoardDto } from "../dtos/response/static-board.dto";
+import { GenerateStaticBoardPayload } from "../dtos/request/generate-static-board.dto";
+import { GetStaticBoardQuery } from "../dtos/request/get-static-board.dto";
+import { Pagination } from "src/global/decorators/pagination-query.decorator";
+import { StaticBoard } from "../entities/static-board.entity";
 
+/**
+ * 애플리케이션 서비스 — 흐름 조율.
+ * - 입력: request payload/query. 출력: 엔티티(도메인). HTTP 응답 DTO 는 만들지 않는다.
+ * - 엔티티→응답 변환은 컨트롤러 경계에서 StaticBoardMapper 로 처리.
+ */
 @Injectable()
 export class StaticBoardService {
-  constructor(
-    private staticBoardRepository: StaticBoardRepository,
-    private dataSource: DataSource
-  ) {}
+  constructor(private readonly staticBoardRepository: StaticBoardRepository) {}
 
   async generateStaticBoard(
-    generateStaticBoardDto: GenerateStaticBoardDto,
+    payload: GenerateStaticBoardPayload,
     transactionManager?: EntityManager
-  ): Promise<StaticBoardDto> {
-    const staticBoard = await this.staticBoardRepository.createStaticBoard(
-      generateStaticBoardDto,
-      transactionManager
-    );
-    return StaticBoardDto.of(staticBoard);
+  ): Promise<StaticBoard> {
+    return this.staticBoardRepository.createStaticBoard(payload, transactionManager);
   }
 
   async getStaticBoard(
-    getStaticBoardDto: GetStaticBoardDto,
+    query: GetStaticBoardQuery,
     transactionManager?: EntityManager
-  ): Promise<StaticBoardDto> {
-    const staticBoard = await this.staticBoardRepository.findStaticBoard(
-      getStaticBoardDto,
-      transactionManager
-    );
-    return StaticBoardDto.of(staticBoard);
+  ): Promise<StaticBoard> {
+    return this.staticBoardRepository.findStaticBoard(query, transactionManager);
   }
 
   async getStaticBoardListAndCount(
-    getStaticBoardDto: GetStaticBoardDto,
+    query: GetStaticBoardQuery,
     pagination: Pagination,
     transactionManager?: EntityManager
-  ): Promise<{ list: StaticBoardDto[]; count: number }> {
-    const { list, count } = await this.staticBoardRepository.findStaticBoardListAndCount(
-      getStaticBoardDto,
+  ): Promise<{ list: StaticBoard[]; count: number }> {
+    return this.staticBoardRepository.findStaticBoardListAndCount(
+      query,
       pagination,
       transactionManager
     );
-    return {
-      list: StaticBoardDto.listOf(list),
-      count: count,
-    };
   }
 }

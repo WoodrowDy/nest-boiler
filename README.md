@@ -44,6 +44,65 @@ backend-nestjs/
 |-- README.md
 ```
 
+## 레이어 아키텍처 규칙 (Entity / DTO / Mapper)
+
+도메인 단위로 폴더를 나누되(package by domain), 내부는 계층형 서비스 아키텍처를 따릅니다.
+각 계층이 **무엇을 받고 무엇을 반환하는지**와 **어디에 정의하는지**를 아래 규칙으로 고정합니다.
+`static-board` 도메인이 참조 구현입니다.
+
+### 핵심 원칙
+
+- **엔티티 = 영속성 전용**: `@Column`·`@Index`·라이프사이클 훅만. `@ApiProperty`(Swagger)·`class-validator`(검증)·`@Transform`(입력 변환)을 두지 않습니다.
+- **검증 + Swagger의 단일 소스 = `dtos/shared` 필드 DTO**. request/response는 여기서 `PickType`/`PartialType` 등으로 파생합니다. (엔티티에서 파생하지 않음)
+- **응답 DTO = 순수 데이터**: 행위/포맷 메서드를 두지 않습니다. 필요하면 util 또는 mapper로.
+- **서비스는 HTTP 응답 DTO를 반환하지 않습니다**: 엔티티/도메인 모델을 반환하고, 엔티티→응답 변환은 **컨트롤러 경계에서 Mapper**로 수행합니다.
+- **Repository는 엔티티만** 다룹니다(DTO를 모름). 반환 타입은 항상 `Entity`/`Entity[]`.
+- **공통 audit 응답 필드**(id/createdAt/updatedAt/deletedAt)는 `AuditResponse`(`src/global/dtos/audit.response.ts`) 한 곳에서 소유합니다.
+
+### 계층별 역할
+
+| 계층 | 입력 | 출력 | 정의 위치 |
+| --- | --- | --- | --- |
+| Controller | Request DTO | Response DTO | `dtos/request`, `dtos/response` |
+| Service | Request payload/query | Entity / 도메인 모델 | `services/` |
+| Repository | 조회 파라미터 / Entity | Entity | `repositories/` |
+| Mapper | Entity | Response DTO | `mappers/` |
+| Entity | — | — | `entities/` (영속성 전용) |
+| 필드 계약(공유) | — | — | `dtos/shared/` |
+| Audit 응답 | — | — | `src/global/dtos/audit.response.ts` |
+
+### 데이터 흐름
+
+```
+Controller(payload/query)
+  → Service(Entity 반환)
+    → Repository(Entity)
+  → Controller 가 Mapper 로 Entity → Response 변환
+```
+
+### 도메인 폴더 구조
+
+```
+domain/<name>/
+  controllers/
+  services/
+  repositories/
+  entities/          # 영속성 전용 (@Column/@Index/훅)
+  dtos/
+    shared/          # 필드 계약 = 검증+Swagger 단일 소스 (엔티티 아님)
+    request/         # 입력 (payload / query)
+    response/        # 출력 (순수 데이터)
+  mappers/           # Entity ↔ DTO 무상태 변환
+```
+
+> **파일명 권장**: 입력 `*.payload.ts` / `*.query.ts`, 출력 `*.response.ts`, 공유 `*-fields.dto.ts`.
+
+### VO (선택)
+
+불변식이 필요한 도메인 값(예: `PhoneNumber`)만 `vo/`에 둡니다.
+**DTO는 경계(transport) 타입, VO는 도메인 값** — 서로 대체 관계가 아니며 다른 레이어입니다.
+단순 CRUD 필드는 DTO + util 로 충분합니다.
+
 ## 기술 스택
 
 - **언어**: TypeScript
