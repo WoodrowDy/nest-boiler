@@ -89,17 +89,44 @@ export default [
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/explicit-module-boundary-types": "off",
       "@typescript-eslint/interface-name-prefix": "off",
-      "prettier/prettier": [
+      // prettier 설정은 .prettierrc 단일 소스에서 읽는다 (인라인 중복 제거 → 설정 드리프트 방지)
+      "prettier/prettier": "error",
+      "max-len": ["error", { code: 100, ignoreUrls: true }],
+    },
+  },
+
+  // ---------- 레이어 경계 강제 (README 아키텍처 규칙의 lint 강제) ----------
+  {
+    // 엔티티 = 영속성 전용: Swagger/검증/변환 import 금지
+    files: ["**/entities/*.entity.ts"],
+    rules: {
+      "no-restricted-imports": [
         "error",
         {
-          singleQuote: false,
-          trailingComma: "all",
-          printWidth: 100,
-          tabWidth: 2,
-          semi: true,
+          paths: [
+            { name: "@nestjs/swagger", message: "엔티티는 영속성 전용 — Swagger는 dto로" },
+            { name: "class-validator", message: "엔티티는 영속성 전용 — 검증은 dto/shared로" },
+            { name: "class-transformer", message: "엔티티는 영속성 전용 — 입력 변환은 dto로" },
+          ],
         },
       ],
-      "max-len": ["error", { code: 100, ignoreUrls: true }],
+    },
+  },
+  {
+    // 서비스/레포 = 응답 DTO를 만들지 않음(변환은 컨트롤러 경계 Mapper)
+    files: ["**/services/*.ts", "**/repositories/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/dtos/response/*", "**/dto/response/*"],
+              message: "서비스/레포는 엔티티를 반환 — 응답 DTO 변환은 컨트롤러 경계(Mapper)에서",
+            },
+          ],
+        },
+      ],
     },
   },
 ];

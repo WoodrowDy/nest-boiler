@@ -103,6 +103,16 @@ domain/<name>/
 **DTO는 경계(transport) 타입, VO는 도메인 값** — 서로 대체 관계가 아니며 다른 레이어입니다.
 단순 CRUD 필드는 DTO + util 로 충분합니다.
 
+### 규칙 강제 (ESLint)
+
+위 레이어 규칙 중 **기계로 강제 가능한 것은 산문이 아니라 lint로** 막습니다 (`eslint.config.mjs`).
+
+- **엔티티**(`**/entities/*.entity.ts`): `@nestjs/swagger`·`class-validator`·`class-transformer` import 금지 → 엔티티에 API/검증/변환 지식이 새는 것을 차단.
+- **서비스·레포**(`**/services/*.ts`, `**/repositories/*.ts`): `dtos/response/**` import 금지 → 응답 DTO는 컨트롤러 경계의 Mapper에서만 생성.
+- 위반 시 `eslint`/pre-commit 에서 에러로 차단됩니다. (규칙 = 자동 강제, README는 근거만 기술)
+
+> Prettier 설정은 `.prettierrc` **단일 소스**로 통일(eslint 인라인 옵션 제거)하여 에디터↔lint 포맷 충돌을 방지합니다.
+
 ## 기술 스택
 
 - **언어**: TypeScript
@@ -155,6 +165,14 @@ pnpm run test:cov
 
 - TypeORM 마이그레이션 및 시드 데이터는 `src/database/migrations/`, `src/database/seeds/`에서 관리합니다.
 - 자세한 사용법은 `src/database/README.md`를 참고하세요.
+
+### 마이그레이션 규칙
+
+- **생성 방식 구분**: 엔티티 스키마 변경 → `pnpm migration:generate`(자동 생성), 데이터 이관·수동 SQL → `pnpm migration:create`(빈 파일 직접 작성).
+- **자동 생성물은 반드시 리뷰**: `migration:generate` 결과를 그대로 믿지 말고 up/down SQL을 확인한 뒤 커밋합니다.
+- **적용된 마이그레이션은 사후 수정 금지**: 이미 반영된 파일은 고치지 말고 항상 **새 마이그레이션**으로 보정합니다(협업·운영 일관성).
+- **prod는 `synchronize: false` 유지**: 스키마는 오직 마이그레이션으로만 변경합니다(`typeorm.config.ts`).
+- **경로는 `*.{js,ts}`**: ts-node(로컬 CLI)와 컴파일(dist/JS 런타임) 양쪽에서 로딩되도록 확장자 glob을 통일합니다.
 
 ## 코딩 컨벤션
 

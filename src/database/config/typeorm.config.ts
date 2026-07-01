@@ -17,7 +17,7 @@ export const dataSourceOptions: DataSourceOptions = {
   logging: false,
   synchronize: false,
   entities: [path.resolve(__dirname, "../../domain/**/entities/*.entity.{js,ts}")],
-  migrations: [path.join(__dirname, "../migrations/*.ts")],
+  migrations: [path.join(__dirname, "../migrations/*.{js,ts}")],
   migrationsTableName: "migrations",
 };
 
