@@ -9,9 +9,12 @@ import { commonConstants } from "./global/constants/common.constants";
 import { swaggerConstants } from "./global/constants/swagger.constants";
 import basicAuth from "express-basic-auth";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { WINSTON_MODULE_NEST_PROVIDER } from "nest-winston";
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {});
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  // Nest 기본 로거를 winston 으로 교체 (로그에 traceId 자동 부착)
+  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
   const port = Number.parseInt(process.env.PORT, 10);
   const env = process.env.NODE_ENV;
   const timezone = process.env.TZ;
@@ -167,7 +170,16 @@ async function bootstrap() {
     }
   });
 
-  console.log(`Server running on port:${port}, env:${env}, timezone:${timezone}`);
+  const appUrl = `http://127.0.0.1:${port}`;
+  const isLocal = env === commonConstants.props.nodeEnvs.LOCAL;
+  // 로컬 외 환경에선 Swagger가 basic-auth 뒤에 있으므로 URL 대신 표기만 노출
+  const swaggerInfo = isLocal ? `${appUrl}${swaggerConstants.props.SWAGGER_PATH}` : "인증 필요";
+  console.log("------------------------------------------------------------");
+  console.log(
+    "\u001B[1m\u001B[32m%s\u001B[0m",
+    `서버환경=${env} | 주소=${appUrl} | Swagger=${swaggerInfo} | TZ=${timezone}`
+  );
+  console.log("------------------------------------------------------------");
 
   process.on("SIGINT", function () {
     // SIGINT: Interrupt from keyboard(such as Ctrl C)
