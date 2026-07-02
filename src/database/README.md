@@ -20,6 +20,27 @@ src/
 
 ---
 
+## 🐘 0. 로컬 데이터베이스 (Docker)
+
+마이그레이션·시드·앱 실행 **전에 로컬 Postgres 가 떠 있어야** 합니다.
+
+```bash
+# 최초 1회: 컨테이너 자격증명 파일 준비 (git 제외)
+cp envs/.env.docker.example envs/.env.docker
+
+pnpm db:up      # Postgres 컨테이너 기동 (healthy 될 때까지 대기)
+pnpm db:down    # 중지 (데이터 볼륨 유지)
+pnpm db:reset   # 볼륨 삭제 후 재기동 (완전 초기화)
+```
+
+- 포트: 호스트 **5433** → 컨테이너 5432 (시스템 Postgres(5432)와 충돌 방지)
+- 최초 기동 시 `nest-boiler`(로컬) / `nest-boiler-test`(테스트) DB 자동 생성
+- 자격증명은 `envs/.env.docker` 단일 소스에서 주입 (compose 에 비밀번호 하드코딩 안 함)
+
+> 최초 실행 전체 순서는 최상단 [`README.md`](../../README.md) 의 "최초 실행" 참고.
+
+---
+
 ## 🔧 1. 데이터베이스 마이그레이션
 
 ### 1.1. 엔티티 생성
@@ -97,8 +118,8 @@ export class StaticBoardSeeder implements Seeder {
       // ... 데이터
     });
 
-    // 개발 환경에서만 더미 데이터 생성
-    if (process.env.NODE_ENV !== "production") {
+    // 운영 외 환경에서만 더미 데이터 생성
+    if (process.env.NODE_ENV !== "prod") {
       const factory = factoryManager.get(StaticBoard);
       await factory.saveMany(10);
     }
@@ -161,12 +182,14 @@ pnpm run setup-db
 ### 3.2. 환경별 실행
 
 ```bash
-# 개발 환경 (더미 데이터 포함)
-NODE_ENV=development pnpm run seed:run
+# 로컬 환경 (더미 데이터 포함)
+NODE_ENV=local pnpm run seed:run
 
 # 운영 환경 (필수 데이터만)
-NODE_ENV=production pnpm run seed:run
+NODE_ENV=prod pnpm run seed:run
 ```
+
+> 환경값은 이 프로젝트 기준 `local | dev | prod | test` 입니다(`development`/`production` 아님).
 
 ---
 

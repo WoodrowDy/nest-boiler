@@ -131,10 +131,34 @@ domain/<name>/
 
 ## 설치 및 실행
 
+### 최초 실행 (first run)
+
 ```bash
-# 의존성 설치
+# 1) 의존성 설치
 pnpm install
 
+# 2) 환경변수 준비 (git 에 없는 파일이므로 example 에서 복사)
+cp envs/.env.docker.example envs/.env.docker   # 로컬 DB 컨테이너 자격증명
+cp envs/.env.local.example  envs/.env.local    # 앱 로컬 환경변수
+
+# 3) 로컬 Postgres(docker) 기동
+pnpm db:up
+
+# 4) 스키마 생성 (마이그레이션)
+pnpm migration:run
+
+# 5) (선택) 시드 데이터 주입
+pnpm seed:run
+
+# 6) 개발 서버 실행
+pnpm run start:local
+```
+
+> DB 상세(마이그레이션/시드/도커)는 [`src/database/README.md`](src/database/README.md) 참고.
+
+### 일반 실행
+
+```bash
 # 개발 서버 실행
 pnpm run start:dev
 

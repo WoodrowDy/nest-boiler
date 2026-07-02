@@ -2,6 +2,7 @@ import { DataSource } from "typeorm";
 import { Seeder, SeederFactoryManager } from "typeorm-extension";
 import { StaticBoardRepository } from "../repositories/static-board.repository";
 import { StaticBoard } from "../entities/static-board.entity";
+import { normalizePhone } from "src/global/helpers/phone.helper";
 
 export class StaticBoardSeeder implements Seeder {
   public async run(dataSource: DataSource, factoryManager: SeederFactoryManager) {
@@ -16,7 +17,7 @@ export class StaticBoardSeeder implements Seeder {
           category: "공지사항",
           isActivated: true,
           writer: "김작가",
-          phone: "010-1234-5678",
+          phone: normalizePhone("010-1234-5678"),
         },
         transactionManager
       );

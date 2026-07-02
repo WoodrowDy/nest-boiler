@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { StaticBoardService } from "../services/static-board.service";
 import { ApiDoc } from "src/global/decorators/api-doc.decorator";
 import { GenerateStaticBoardPayload } from "../dtos/request/generate-static-board.dto";
@@ -8,6 +8,7 @@ import { StaticBoardMapper } from "../mappers/static-board.mapper";
 import { ObjectResponse } from "src/global/dtos/object-response.dto";
 import { ListResponse } from "src/global/dtos/list-response.dto";
 import { PaginatedQuery, Pagination } from "src/global/decorators/pagination-query.decorator";
+import { ModifyStaticBoardPayload } from "../dtos/request/modify-static-board.dto";
 
 /**
  * HTTP 경계.
@@ -61,5 +62,26 @@ export class StaticBoardController {
     const staticBoard = await this.staticBoardService.getStaticBoard({ id });
 
     return new ObjectResponse(StaticBoardMapper.toResponse(staticBoard));
+  }
+
+  @ApiDoc({
+    summary: "테스트 보드 수정",
+    description: "테스트 보드 수정",
+  })
+  @Patch("/:id")
+  async patchStaticBoard(
+    @Param("id") id: number,
+    @Body() payload: ModifyStaticBoardPayload
+  ): Promise<void> {
+    await this.staticBoardService.modiftyStaticBoard(id, payload);
+  }
+
+  @ApiDoc({
+    summary: "테스트 보드 삭제",
+    description: "테스트 보드 삭제",
+  })
+  @Delete("/:id")
+  async deleteStaticBoard(@Param("id") id: number): Promise<void> {
+    await this.staticBoardService.removeStaticBoard(id);
   }
 }

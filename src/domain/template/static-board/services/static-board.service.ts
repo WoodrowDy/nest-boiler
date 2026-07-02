@@ -5,6 +5,7 @@ import { GenerateStaticBoardPayload } from "../dtos/request/generate-static-boar
 import { GetStaticBoardQuery } from "../dtos/request/get-static-board.dto";
 import { Pagination } from "src/global/decorators/pagination-query.decorator";
 import { StaticBoard } from "../entities/static-board.entity";
+import { ModifyStaticBoardPayload } from "../dtos/request/modify-static-board.dto";
 
 /**
  * 애플리케이션 서비스 — 흐름 조율.
@@ -39,5 +40,21 @@ export class StaticBoardService {
       pagination,
       transactionManager
     );
+  }
+
+  async modiftyStaticBoard(
+    id: number,
+    payload: ModifyStaticBoardPayload,
+    transactionManager?: EntityManager
+  ): Promise<void> {
+    await this.getStaticBoard({ id });
+
+    await this.staticBoardRepository.updateStaticBoard(id, payload, transactionManager);
+  }
+
+  async removeStaticBoard(id: number, transactionManager?: EntityManager): Promise<void> {
+    await this.getStaticBoard({ id });
+
+    await this.staticBoardRepository.deleteStaticBoard(id, transactionManager);
   }
 }

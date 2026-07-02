@@ -1,8 +1,26 @@
 import { applyDecorators } from "@nestjs/common";
-import { ApiExtraModels, ApiOkResponse, ApiOperation, getSchemaPath } from "@nestjs/swagger";
+import {
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiOperation,
+  ApiResponse,
+  getSchemaPath,
+} from "@nestjs/swagger";
 import { ListResponse } from "../dtos/list-response.dto";
 import { ObjectResponse } from "../dtos/object-response.dto";
 import { ApiDocOptions } from "../interfaces/api-doc.options";
+
+/**
+ * 모든 엔드포인트에 공통으로 문서화할 표준 에러 응답.
+ * 실제 런타임 에러 형태(Nest 기본 필터: { statusCode, message, error })와 일치.
+ */
+const STANDARD_ERROR_RESPONSES = [
+  { status: 400, code: "BAD_REQUEST", message: "잘못된 요청(유효성 검증 실패 등)" },
+  { status: 401, code: "UNAUTHORIZED", message: "인증이 필요합니다" },
+  { status: 403, code: "FORBIDDEN", message: "접근 권한이 없습니다" },
+  { status: 404, code: "NOT_FOUND", message: "리소스를 찾을 수 없습니다" },
+  { status: 500, code: "INTERNAL_SERVER_ERROR", message: "서버 오류가 발생했습니다" },
+];
 
 /**
  * Decorator - swagger API
@@ -25,6 +43,7 @@ export const ApiDoc = (options: ApiDocOptions) => {
     responseModel,
     isArrayResponse = false,
     deprecated = false,
+    withStandardErrors = true,
   } = options;
 
   const decorators = [];
@@ -107,6 +126,24 @@ export const ApiDoc = (options: ApiDocOptions) => {
       },
     });
     decorators.push(listResponse);
+  }
+
+  /**
+   * 표준 에러 응답(400/401/403/404/500) 문서 등록
+   */
+  if (withStandardErrors) {
+    for (const errorResponse of STANDARD_ERROR_RESPONSES) {
+      decorators.push(
+        ApiResponse({
+          status: errorResponse.status,
+          ...createErrorResponseSchemaExamples(errorResponse.message, {
+            statusCode: errorResponse.status,
+            message: errorResponse.message,
+            error: errorResponse.code,
+          }),
+        })
+      );
+    }
   }
 
   return applyDecorators(...decorators);

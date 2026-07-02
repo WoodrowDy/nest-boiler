@@ -2,6 +2,7 @@ import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { IsBoolean, IsDate, IsString, Length, Matches } from "class-validator";
 import { transformStringToDate } from "src/global/helpers/date.helper";
+import { normalizePhone } from "src/global/helpers/phone.helper";
 import { regexConstants } from "src/global/constants/regex.constants";
 
 /**
@@ -27,6 +28,7 @@ export class StaticBoardFields {
   birth: Date;
 
   @ApiProperty({ description: "작성자 휴대폰 번호", example: "01012345678" })
+  @Transform(({ value }) => (typeof value === "string" ? normalizePhone(value) : value))
   @Matches(regexConstants.props.PHONE)
   phone: string;
 

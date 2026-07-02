@@ -26,5 +26,10 @@ export interface ApiDocOptions {
    */
   deprecated?: boolean;
 
+  /**
+   * 표준 에러 응답(400/401/403/404/500) Swagger 문서 자동 포함 여부 (기본: true)
+   */
+  withStandardErrors?: boolean;
+
   // authUserOnly?: boolean;
 }
