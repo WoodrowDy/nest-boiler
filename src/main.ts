@@ -71,6 +71,8 @@ async function bootstrap() {
   /**
    * GlobalFilters
    */
+  // TODO(P1): 전역 예외 필터 — 에러 응답 통일({ success:false, error, meta:{traceId} })
+  //           + DB 에러코드 매핑(unique→409 등). 상세: docs/TODO.md
 
   /**
    * DB

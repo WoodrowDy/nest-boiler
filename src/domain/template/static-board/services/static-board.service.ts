@@ -42,7 +42,7 @@ export class StaticBoardService {
     );
   }
 
-  async modiftyStaticBoard(
+  async modifyStaticBoard(
     id: number,
     payload: ModifyStaticBoardPayload,
     transactionManager?: EntityManager

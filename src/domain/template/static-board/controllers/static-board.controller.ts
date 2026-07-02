@@ -73,7 +73,7 @@ export class StaticBoardController {
     @Param("id") id: number,
     @Body() payload: ModifyStaticBoardPayload
   ): Promise<void> {
-    await this.staticBoardService.modiftyStaticBoard(id, payload);
+    await this.staticBoardService.modifyStaticBoard(id, payload);
   }
 
   @ApiDoc({

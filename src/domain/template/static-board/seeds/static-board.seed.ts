@@ -23,21 +23,23 @@ export class StaticBoardSeeder implements Seeder {
       );
     });
 
-    // 🎲 방식 2: Factory로 랜덤 데이터 생성
-    //if (process.env.NODE_ENV !== 'prod') {}
-    console.log("🎲 Creating random data with Factory...");
-    const staticBoardFactory = factoryManager.get(StaticBoard);
+    // 🎲 방식 2: Factory로 랜덤 데이터 생성 (운영 환경에서는 생성하지 않음)
+    if (process.env.NODE_ENV !== "prod") {
+      console.log("🎲 Creating random data with Factory...");
+      const staticBoardFactory = factoryManager.get(StaticBoard);
 
-    // 공지사항 카테고리로 5개
-    await staticBoardFactory.saveMany(5, {
-      category: "공지사항",
-      isActivated: true,
-    });
+      // 공지사항 카테고리로 5개
+      await staticBoardFactory.saveMany(5, {
+        category: "공지사항",
+        isActivated: true,
+      });
 
-    // 완전 랜덤 10개
-    await staticBoardFactory.saveMany(10);
+      // 완전 랜덤 10개
+      await staticBoardFactory.saveMany(10);
 
-    console.log("✅ 15 random records created with Factory!");
+      console.log("✅ 15 random records created with Factory!");
+    }
+
     console.log("🎯 All StaticBoard seeding completed!");
   }
 }
