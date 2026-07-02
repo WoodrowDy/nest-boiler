@@ -159,12 +159,10 @@ pnpm run start:local
 ### 일반 실행
 
 ```bash
-# 개발 서버 실행
-pnpm run start:dev
+# 로컬 서버 실행
+pnpm run start:local
 
-# 프로덕션 빌드 및 실행
-pnpm run build
-pnpm run start:prod
+# 필요 시, 환경에 맞게 cross-env 활용
 ```
 
 ## 테스트
