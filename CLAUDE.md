@@ -1,130 +1,193 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
+
+NestJS + TypeScript + TypeORM + PostgreSQL boilerplate. Package manager: **pnpm**.
+
+---
 
 ## Development Commands
 
-### Build & Start
+### Build & Run
+
 ```bash
-pnpm run build                    # Build for production
-pnpm run start:local             # Start local development server (Asia/Seoul timezone)
-pnpm run start:dev               # Start dev environment (Asia/Seoul timezone)
-pnpm run start:prod              # Start production server
-pnpm run format                  # Format code with Prettier
-pnpm run lint                    # Lint and fix TypeScript files
+pnpm run build          # Production build (nest build)
+pnpm run start:local    # Local dev server (NODE_ENV=local, TZ=Asia/Seoul, --watch)
+pnpm run start:dev      # Dev server (NODE_ENV=dev)
+pnpm run start:prod     # Production (node dist/main)
+pnpm run format         # Prettier
+pnpm run lint           # eslint --fix
 ```
+
+### Local Database (Docker)
+
+Postgres must be running before migrations/seeds/tests.
+
+```bash
+cp envs/.env.docker.example envs/.env.docker   # once (git-ignored credentials)
+pnpm db:up      # start Postgres container, wait until healthy
+pnpm db:down    # stop (volume kept)
+pnpm db:reset   # drop volume + restart (full reset)
+```
+
+- Host port **5433** → container 5432 (avoids clashing with a system Postgres).
+- Credentials come from a single source: `envs/.env.docker` (never hardcoded in `docker-compose.yml`).
+- On first boot the init script creates both `nest-boiler` (local) and `nest-boiler-test` (test) DBs.
+
+### Migrations & Seeds
+
+```bash
+pnpm run migration:generate   # generate from entity diff (review before commit!)
+pnpm run migration:create     # empty migration (manual/data changes)
+pnpm run migration:run        # apply
+pnpm run migration:revert     # revert last
+pnpm run seed:run             # run MainSeeder
+pnpm run setup-db             # generate + run + seed
+```
+
+CLI scripts run with `cross-env NODE_ENV=local`, so they target the local DB in `envs/.env.local`.
 
 ### Testing
+
 ```bash
-pnpm run test                    # Run unit tests
-pnpm run test:watch              # Run tests in watch mode
-pnpm run test:cov                # Run tests with coverage
-pnpm run test:local              # Run e2e tests (verbose, silent)
-pnpm run test:e2e                # Run e2e tests
+pnpm run test:local   # e2e (auto-runs `db:up` via pretest:local)
+pnpm run test:e2e     # e2e
+pnpm run test         # jest unit
+pnpm run test:cov     # coverage
 ```
 
-### Database Operations
+### First run (fresh clone)
+
 ```bash
-pnpm run setup-db                # Complete database setup (migration + seed)
-pnpm run migration:generate      # Generate migration from entity changes
-pnpm run migration:run           # Apply migrations
-pnpm run migration:revert        # Revert last migration
-pnpm run seed:run                # Run all seeds via MainSeeder
-pnpm run seed:revert             # Revert seeds
+pnpm install
+cp envs/.env.docker.example envs/.env.docker
+cp envs/.env.local.example  envs/.env.local
+pnpm db:up && pnpm migration:run && pnpm seed:run
+pnpm run start:local
 ```
 
-### Git Hooks (Husky)
-```bash
-# Automatic hooks (no manual commands needed):
-# - Pre-commit: Runs lint-staged (eslint --fix + prettier --write)
-# - Pre-push: Runs pnpm run test:local (e2e tests)
+---
+
+## Architecture
+
+Directories are organized by domain (package-by-domain), but the internal architecture is a
+classic **layered service architecture** (Controller → Service → Repository → Entity). This is
+"DDD-lite": DDD-style module boundaries over an anemic domain model. Not full tactical DDD.
+
+```
+src/
+  domain/<name>/
+    controllers/   # HTTP boundary
+    services/      # orchestration (validation, transaction boundary)
+    repositories/  # data access (Entity in/out only)
+    entities/      # persistence-only (@Column, @Index)
+    dtos/
+      shared/      # field contract: @ApiProperty + class-validator (+ @Transform)
+      request/     # payload / query (derived from shared)
+      response/    # output-only (derived from shared + AuditResponse)
+    mappers/       # Entity -> Response (stateless)
+    seeds/         # domain seed + factory
+  global/          # cross-cutting: constants, decorators, dtos, helpers, interceptors, middlewares, context, logger
+  database/        # typeorm.config.ts, migrations/, seeds/main.seed.ts, entities/ (core-hard/core-soft base)
 ```
 
-## Architecture Overview
+Reference implementation: **`src/domain/template/static-board/`** — copy this when adding a domain.
 
-### Domain-Driven Design Structure
-This NestJS application follows DDD patterns with domain-based directory organization:
+---
 
-- **`src/domain/`** - Business domains, each containing:
-  - `controllers/` - HTTP endpoints
-  - `services/` - Business logic
-  - `entities/` - TypeORM entities
-  - `repositories/` - Data access layer
-  - `dtos/` - Data transfer objects (request/response)
-  - `seeds/` - Domain-specific seed data
-  - `{domain}.module.ts` - Domain module configuration
+## Layer Rules (enforced)
 
-- **`src/global/`** - Shared utilities and cross-cutting concerns:
-  - `constants/` - Application constants
-  - `decorators/` - Custom decorators (API docs, validation, etc.)
-  - `dtos/` - Shared DTOs (pagination, responses)
-  - `helpers/` - Utility functions (crypto, date, HTTP)
-  - `interceptors/` - Response logging
-  - `middlewares/` - Request logging
+Documented in `README.md` and **mechanically enforced by ESLint** (`no-restricted-imports` in
+`eslint.config.mjs`). Prefer lint enforcement over prose.
 
-- **`src/database/`** - Database configuration and migrations:
-  - `config/typeorm.config.ts` - TypeORM configuration with PostgreSQL
-  - `migrations/` - Database migrations (auto-generated)
-  - `seeds/main.seed.ts` - Master seeder that orchestrates all domain seeds
-  - `entities/` - Base entities (core-hard, core-soft)
+- **Entity = persistence only.** No `@ApiProperty` (Swagger), no `class-validator`, no
+  `class-transformer`. Those responsibilities live in `dtos/shared`.
+  → ESLint blocks importing `@nestjs/swagger` / `class-validator` / `class-transformer` in `**/entities/*.entity.ts`.
+- **DTOs derive from a single field contract.** `dtos/shared/*-fields.dto.ts` owns validation +
+  Swagger; request/response DTOs derive via `PickType`/`PartialType`/`IntersectionType`. Do NOT
+  derive DTOs from the entity.
+- **Response DTOs are pure data** (no methods). Formatting/behavior goes to a util or the mapper.
+  Audit fields (id/createdAt/updatedAt/deletedAt) come from `global/dtos/audit.response.ts`.
+- **Service returns entities/domain**, never HTTP response DTOs. Entity→Response conversion happens
+  at the controller boundary via the mapper.
+  → ESLint blocks importing `**/dtos/response/**` in `**/services/*.ts` and `**/repositories/*.ts`.
+- **Repository handles queries only.** Existence checks (404) and transaction boundaries live in the
+  service. Return type is always `Entity` / `Entity[]`.
 
-### Key Modules
-- **JWT Module** (`src/domain/jwt/`) - Authentication middleware and services
-- **Static Board Template** (`src/domain/template/static-board/`) - Example domain implementation
+Prettier config is a single source: `.prettierrc` (ESLint reads it, no inline options).
 
-### Testing Structure
-- **Unit tests**: Located alongside source files (`*.spec.ts`)
-- **E2E tests**: In `test/` directory with domain-specific organization:
-  - `fixtures/` - API call functions
-  - `mocks/` - Test data
-  - `scenarios/` - Test scenarios (`*.e2e-spec.ts`)
+---
 
-## Development Workflow
+## Transactions
 
-### Adding New Domain
-1. Create domain directory in `src/domain/`
-2. Implement standard structure (controllers, services, entities, etc.)
-3. Register module in `src/app.module.ts`
-4. Generate and run migrations for new entities
-5. Create domain seeds and register in `main.seed.ts`
+The transaction **boundary is the service**, not the repository. Repositories are transaction-aware
+but not transaction-owning: each method accepts an optional `transactionManager?: EntityManager` and
+resolves the manager once:
 
-### Database Changes
-1. Modify entities
-2. Run `pnpm run migration:generate`
-3. Review generated migration
-4. Run `pnpm run migration:run`
-5. Update seeds if needed
+```ts
+const manager = transactionManager ?? this.manager;   // repo's own manager if none passed
+```
 
-### Environment Configuration
-- Environment files managed in `envs/` directory
-- Validation schema in `app.module.ts` using Joi
-- Supports environments: local, dev, prod, test
-- Timezone set to Asia/Seoul for local and dev environments
+- Single-row op → call the repo without a manager (single statement is atomic).
+- Multi-step / needs a lock → service opens `dataSource.transaction(m => ...)` and passes `m` to each repo call so they share one transaction.
 
-## Important Notes
+## TypeORM hooks vs query methods
 
-- Uses pnpm as package manager
-- PostgreSQL with TypeORM
-- All entities auto-discovered via glob pattern
-- Swagger API documentation available at `/api-docs`
-- JWT middleware applies to all routes
-- Seeding supports environment-specific data (production vs development)
+- Entity lifecycle hooks (`@BeforeInsert`/`@BeforeUpdate`) run **only** with entity-based ops
+  (`save`, `softRemove`). Query-builder ops (`update`, `insert`, `delete`, `softDelete`) **skip** hooks.
+- `manager.create(...)` only instantiates an object — it does **not** run hooks. Hooks fire on `save`.
+- Convention here: **input normalization lives in the DTO (`@Transform`), not entity hooks** — it is
+  path-independent (works for save/update/seed) and keeps the entity pure. Example: phone
+  normalization uses `normalizePhone` (`global/helpers/phone.helper.ts`), shared by the DTO `@Transform`
+  and the seeds.
 
-## Git Hooks Configuration
+---
 
-### Pre-commit Hook
-- **Trigger**: Before each commit
-- **Action**: Runs `lint-staged` which applies:
-  - ESLint with auto-fix (`eslint --fix`)
-  - Prettier formatting (`prettier --write`)
-- **Files**: Only staged TypeScript and JavaScript files (`*.{ts,js}`)
+## Responses & Observability
 
-### Pre-push Hook  
-- **Trigger**: Before each push to remote
-- **Action**: Runs `pnpm run test:local` (e2e tests)
-- **Purpose**: Ensures all tests pass before code reaches remote repository
+- Success responses are wrapped by `ObjectResponse` (`{ row, meta }`) / `ListResponse`
+  (`{ rows, count, meta }`). `meta = { traceId, timestamp }`.
+- **traceId**: `TraceIdMiddleware` assigns one per request (uses incoming `X-Request-Id` or a UUID),
+  stores it in `AsyncLocalStorage` (`global/context/request-context.ts`), and returns it as the
+  `X-Request-Id` response header.
+- **Logging**: Winston (`global/logger/winston.config.ts`) via `app.useLogger`. Every log line gets
+  the request's traceId automatically. Access logs: `RequestLoggerMiddleware` (`HTTP REQ`) and
+  `ResponseLoggerInterceptor` (`HTTP RES`, status + duration; level = info/warn/error by status).
+- Swagger: use the `@ApiDoc` decorator. It documents the success response and auto-includes standard
+  error responses (400/401/403/404/500). Available at `/api-docs`.
 
-### Configuration Files
-- **Husky**: `.husky/` directory contains hook scripts
-- **Lint-staged**: Configuration in `package.json` under `lint-staged` field
-- **Setup**: Automatic via `prepare` script in `package.json`
+---
+
+## Conventions Recap
+
+- Errors thrown as Nest `HttpException`s (`NotFoundException`/`BadRequestException` with messages from
+  the domain's `*.constants.ts`).
+- Migrations: entity change → `migration:generate` (auto), data/manual → `migration:create`.
+  - **Never edit an applied migration** — add a new one. In VS Code, `src/database/migrations/**` is
+    marked **read-only** (`.vscode/settings.json` → `files.readonlyInclude`), so trying to edit a
+    migration (even a freshly generated one, e.g. to turn a `DROP`+`ADD` into an `ALTER`) requires
+    explicitly toggling read-only off — an edit-time "are you sure?" nudge (no git hook involved).
+  - **Review the generated SQL before committing.** For a simple column change, prefer an in-place
+    `ALTER` (modify) over `DROP`+`ADD`, which loses data. TypeORM decides automatically; if it emits a
+    destructive `DROP`+`ADD` for something that could be an `ALTER`, hand-fix it (unless intentional).
+    This is a human review call, not automated.
+  - prod keeps `synchronize: false`; migration glob is `*.{js,ts}` (loads under ts-node and compiled runtime).
+- Seeds: factory (random) data is guarded by `NODE_ENV !== "prod"`; prod seeds only essential data.
+- Environments: `local | dev | prod | test`, files in `envs/` selected by `NODE_ENV` (`envs/env.ts`).
+  `.env.*` are git-ignored; `.env.*.example` are committed templates.
+
+---
+
+## Git Hooks (Husky)
+
+- **pre-commit**: `lint-staged` → `eslint --fix` + `prettier --write` on staged `*.{ts,js}`.
+- **pre-push**: `pnpm run test:local` (e2e). Needs a running DB — `pretest:local` starts it via `db:up`.
+  Use `git push --no-verify` to skip if the DB is unavailable.
+
+---
+
+## Backlog
+
+Open items and "adopt from cmes-server when triggered" candidates are tracked in
+`docs/TODO.md` and `docs/cmes-adoption-candidates.md` (both git-ignored, local notes).
+Top P1: global exception filter (unify error envelope with traceId), real auth flow, stricter env validation.

@@ -112,6 +112,20 @@ domain/<name>/
 
 > Prettier 설정은 `.prettierrc` **단일 소스**로 통일(eslint 인라인 옵션 제거)하여 에디터↔lint 포맷 충돌을 방지합니다.
 
+### 트랜잭션 & 영속성
+
+- **트랜잭션 경계는 서비스**입니다. 레포는 트랜잭션을 소유하지 않고 참여만 — 각 메서드가 `transactionManager?`를 받아 `const manager = transactionManager ?? this.manager`로 매니저를 해석합니다.
+  - 단건 op → manager 없이 호출(단일 statement는 원자적). 다단계/락 → 서비스가 `dataSource.transaction((m) => ...)`으로 열고 각 레포에 `m`을 전달해 한 트랜잭션 공유.
+- **엔티티 훅 vs 쿼리 메서드**: `@BeforeInsert`/`@BeforeUpdate`는 **엔티티 기반 op(`save`/`softRemove`)에서만** 실행됩니다. 쿼리빌더 op(`update`/`insert`/`delete`/`softDelete`)는 훅을 건너뜁니다. `create()`는 인스턴스만 만들 뿐 훅을 태우지 않습니다.
+- **입력 정규화는 엔티티 훅이 아니라 DTO `@Transform`으로** 처리합니다 — 경로 독립적(save/update/seed 무관)이고 엔티티를 순수하게 유지. 예: 전화번호는 `normalizePhone`(`src/global/helpers/phone.helper.ts`)을 DTO `@Transform`과 시드가 공유합니다.
+
+### 응답 & 관측성
+
+- 성공 응답은 `ObjectResponse`(`{ row, meta }`)/`ListResponse`(`{ rows, count, meta }`)로 래핑됩니다. `meta = { traceId, timestamp }`.
+- **traceId**: `TraceIdMiddleware`가 요청마다 부여(유입 `X-Request-Id` 우선, 없으면 UUID) → `AsyncLocalStorage`에 저장 → 응답 헤더 `X-Request-Id`로 반환.
+- **로깅**: winston(`app.useLogger`) — 모든 로그 라인에 traceId 자동 부착. 액세스 로그는 `RequestLoggerMiddleware`(`HTTP REQ`)와 `ResponseLoggerInterceptor`(`HTTP RES`, 상태코드+소요시간, 레벨 info/warn/error 분기).
+- **Swagger**: `@ApiDoc` 데코레이터가 성공 응답 + **표준 에러 응답(400/401/403/404/500)** 을 자동 문서화. `/api-docs`.
+
 ## 기술 스택
 
 - **언어**: TypeScript
@@ -191,7 +205,8 @@ pnpm run test:cov
 
 - **생성 방식 구분**: 엔티티 스키마 변경 → `pnpm migration:generate`(자동 생성), 데이터 이관·수동 SQL → `pnpm migration:create`(빈 파일 직접 작성).
 - **자동 생성물은 반드시 리뷰**: `migration:generate` 결과를 그대로 믿지 말고 up/down SQL을 확인한 뒤 커밋합니다.
-- **적용된 마이그레이션은 사후 수정 금지**: 이미 반영된 파일은 고치지 말고 항상 **새 마이그레이션**으로 보정합니다(협업·운영 일관성).
+- **단순 컬럼 변경은 `ALTER`(modify) 우선**: 단순 변경인데 `DROP`+`ADD`(데이터 손실)로 생성됐다면, 룰에 저촉되지 않는 한 in-place `ALTER`로 손수 고칩니다. (TypeORM 자동 판단이라 사람이 리뷰하는 영역)
+- **적용된 마이그레이션은 사후 수정 금지**: 이미 반영된 파일은 고치지 말고 항상 **새 마이그레이션**으로 보정합니다(협업·운영 일관성). VS Code에서는 `src/database/migrations/**`가 **읽기전용**(`.vscode/settings.json`의 `files.readonlyInclude`)이라, 실수로 편집하려 하면 에디터가 막습니다. 정말 고쳐야 하면(예: 생성된 마이그레이션의 `DROP`+`ADD`를 `ALTER`로) **읽기전용을 명시적으로 해제**한 뒤 편집 — 편집 순간의 "정말 할거냐?" 확인 역할.
 - **prod는 `synchronize: false` 유지**: 스키마는 오직 마이그레이션으로만 변경합니다(`typeorm.config.ts`).
 - **경로는 `*.{js,ts}`**: ts-node(로컬 CLI)와 컴파일(dist/JS 런타임) 양쪽에서 로딩되도록 확장자 glob을 통일합니다.
 
