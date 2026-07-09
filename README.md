@@ -115,7 +115,7 @@ domain/<name>/
 ### 트랜잭션 & 영속성
 
 - **트랜잭션 경계는 서비스**입니다. 레포는 트랜잭션을 소유하지 않고 참여만 — 각 메서드가 `transactionManager?`를 받아 `const manager = transactionManager ?? this.manager`로 매니저를 해석합니다.
-  - 단건 op → manager 없이 호출(단일 statement는 원자적). 다단계/락 → 서비스가 `dataSource.transaction((m) => ...)`으로 열고 각 레포에 `m`을 전달해 한 트랜잭션 공유.
+  - 외부 tx(`transactionManager`)를 받으면 그대로 합류해 실행(commit/rollback/release는 소유자 몫). 없으면 — 단건 op → 트랜잭션 없이 호출(단일 statement는 원자적), 다단계/락 → 서비스가 새 트랜잭션(`createQueryRunner()` → connect → startTransaction → commit/rollback → release)을 열어 각 레포에 매니저를 전달해 한 트랜잭션 공유.
 - **엔티티 훅 vs 쿼리 메서드**: `@BeforeInsert`/`@BeforeUpdate`는 **엔티티 기반 op(`save`/`softRemove`)에서만** 실행됩니다. 쿼리빌더 op(`update`/`insert`/`delete`/`softDelete`)는 훅을 건너뜁니다. `create()`는 인스턴스만 만들 뿐 훅을 태우지 않습니다.
 - **입력 정규화는 엔티티 훅이 아니라 DTO `@Transform`으로** 처리합니다 — 경로 독립적(save/update/seed 무관)이고 엔티티를 순수하게 유지. 예: 전화번호는 `normalizePhone`(`src/global/helpers/phone.helper.ts`)을 DTO `@Transform`과 시드가 공유합니다.
 

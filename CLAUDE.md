@@ -128,8 +128,9 @@ resolves the manager once:
 const manager = transactionManager ?? this.manager;   // repo's own manager if none passed
 ```
 
-- Single-row op → call the repo without a manager (single statement is atomic).
-- Multi-step / needs a lock → service opens `dataSource.transaction(m => ...)` and passes `m` to each repo call so they share one transaction.
+- If an external tx (`transactionManager`) is passed, join it as-is and just run (the owner/caller does commit/rollback/release). Otherwise:
+- Single-row op → call the repo without opening a transaction (single statement is atomic).
+- Multi-step / needs a lock → service opens a new transaction with `createQueryRunner()` (connect → startTransaction → commit/rollback → release) and passes the manager to each repo call so they share one transaction.
 
 ## TypeORM hooks vs query methods
 
