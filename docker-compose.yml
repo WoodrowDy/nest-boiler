@@ -4,14 +4,17 @@
 #   최초 1회: cp envs/.env.docker.example envs/.env.docker
 services:
   postgres:
+    # ★ -alpine 은 musl libc 다. 운영 DB 가 glibc(대부분의 관리형 Postgres)면
+    #   같은 버전이라도 한글 ORDER BY 순서가 갈릴 수 있다. 맞춰야 하면 -alpine 을 뗀다.
     image: "postgres:16-alpine"
     container_name: "nest-boiler-postgres"
     # 컨테이너 자격증명/타임존을 파일 하나에서 주입 (단일 소스)
     env_file:
       - envs/.env.docker
     ports:
-      # host:container — 시스템 Postgres(5432)와 충돌 방지를 위해 host는 5433 사용
-      - "${POSTGRES_PORT:-5433}:5432"
+      # host:container — 포트 충돌 방지. 5432·5433 은 이미 쓰이고 있을 수 있다.
+      # ★ 이 값은 envs/.env.docker 로 못 바꾼다 — env_file 은 컨테이너 안으로만 주입된다.
+      - "${POSTGRES_PORT:-5434}:5432"
     healthcheck:
       # 컨테이너 내부 env(env_file 주입값)로 확인 ($$ → 컨테이너에서 $ 로 평가)
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]

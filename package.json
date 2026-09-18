@@ -25,15 +25,23 @@
     "pretest:local": "bash scripts/db-up.sh",
     "test:local": "jest --config ./test/jest-e2e.json --verbose=true --silent=true",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "typeorm": "cross-env NODE_ENV=local ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js --dataSource ./src/database/config/typeorm.config.ts",
+    "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js --dataSource ./src/database/config/typeorm.config.ts",
     "migration:create": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:create src/database/migrations/Migration",
-    "migration:generate": "pnpm run typeorm migration:generate src/database/migrations/AutoMigration",
-    "migration:run": "pnpm run typeorm migration:run",
-    "migration:revert": "pnpm run typeorm migration:revert",
+    "migration:lint": "bash scripts/migration-lint.sh",
+    "migration:generate": "cross-env NODE_ENV=local pnpm run typeorm migration:generate src/database/migrations/AutoMigration",
+    "migration:run": "cross-env NODE_ENV=local pnpm run typeorm migration:run",
+    "migration:revert": "cross-env NODE_ENV=local pnpm run typeorm migration:revert",
     "seed:run": "cross-env NODE_ENV=local ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./src/database/config/typeorm.config.ts",
     "seed:revert": "cross-env NODE_ENV=local ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:revert -d ./src/database/config/typeorm.config.ts",
     "setup-db": "pnpm run migration:generate && pnpm run migration:run && pnpm run seed:run",
-    "prepare": "husky"
+    "prepare": "husky",
+    "migration:show": "cross-env NODE_ENV=local pnpm run typeorm migration:show",
+    "migrate:show:dev": "bash scripts/migrate.sh dev show",
+    "migrate:run:dev": "bash scripts/migrate.sh dev",
+    "migrate:revert:dev": "bash scripts/migrate.sh dev revert",
+    "migrate:show:prod": "bash scripts/migrate.sh prod show",
+    "migrate:run:prod": "bash scripts/migrate.sh prod",
+    "migrate:revert:prod": "bash scripts/migrate.sh prod revert"
   },
   "dependencies": {
     "@eslint/eslintrc": "^3.1.0",
@@ -90,6 +98,7 @@
     "jest": "^29.5.0",
     "lint-staged": "^16.1.2",
     "prettier": "^3.4.2",
+    "shellcheck": "^4.1.0",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.0",
@@ -103,6 +112,9 @@
     "*.{ts,js}": [
       "eslint --fix",
       "prettier --write"
+    ],
+    "*.sh": [
+      "shellcheck"
     ]
   },
   "jest": {

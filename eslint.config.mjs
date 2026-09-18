@@ -17,7 +17,13 @@ const compat = new FlatCompat({
 
 export default [
   {
-    ignores: ["node_modules/**", "dist/**", "coverage/**"],
+    ignores: [
+      "node_modules/**",
+      "dist/**",
+      "coverage/**",
+      // 적용된 마이그레이션은 수정하지 않는다 — .prettierignore 와 같은 이유
+      "src/database/migrations/**",
+    ],
   },
   ...compat.extends("plugin:@typescript-eslint/recommended", "plugin:prettier/recommended"),
   // unicorn 권장 규칙 전체 ON (flat config 포맷). 아래 커스텀 블록에서 NestJS에 맞게 일부 override
