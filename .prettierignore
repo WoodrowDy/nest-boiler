@@ -1,0 +1,10 @@
+# 적용된 마이그레이션은 수정하지 않는다.
+#
+# ★ .vscode/settings.json 의 files.readonlyInclude 가 에디터에서 막고 있지만
+#   lint-staged 는 그것을 모르고 --write 로 고친다. 세 정책을 한 방향으로 맞춘다.
+#   (CLAUDE.md — "Never edit an applied migration")
+src/database/migrations/**
+
+node_modules
+dist
+coverage

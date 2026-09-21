@@ -41,7 +41,22 @@ import { StaticBoardModule } from "./domain/template/static-board/static-board.m
          */
       }),
     }),
-    TypeOrmModule.forRoot(AppDataSource.options),
+    TypeOrmModule.forRoot({
+      ...AppDataSource.options,
+      /**
+       * ★ 연결 실패를 빨리 드러낸다.
+       *
+       *   기본값은 10회 x 3초라 30초 가까이 아무 말 없이 멈춰 있다가 실패한다.
+       *   붙을 수 없는 이유(도커 미기동 · 주소 오타 · 방화벽)는 재시도로 해결되지
+       *   않는 것이 대부분이고, 그 시간은 처음 접하는 사람에게 "먹통" 으로 보인다.
+       *   일시적 끊김을 위한 여유만 남긴다.
+       *
+       *   ★ 이 옵션은 TypeOrmModule 의 것이다. dataSourceOptions 에 넣으면
+       *     PostgresConnectionOptions 에 없는 속성이라 컴파일이 깨진다.
+       */
+      retryAttempts: 2,
+      retryDelay: 1000,
+    }),
     JwtModule.forRoot({
       jwtSecret: process.env.JWT_SECRET,
     }),

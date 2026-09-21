@@ -30,7 +30,7 @@ pnpm db:down    # stop (volume kept)
 pnpm db:reset   # drop volume + restart (full reset)
 ```
 
-- Host port **5433** → container 5432 (avoids clashing with a system Postgres).
+- Host port **5434** → container 5432 (avoids clashing with a system Postgres on 5432 or another project on 5433).
 - Credentials come from a single source: `envs/.env.docker` (never hardcoded in `docker-compose.yml`).
 - On first boot the init script creates both `nest-boiler` (local) and `nest-boiler-test` (test) DBs.
 
@@ -43,9 +43,33 @@ pnpm run migration:run        # apply
 pnpm run migration:revert     # revert last
 pnpm run seed:run             # run MainSeeder
 pnpm run setup-db             # generate + run + seed
+pnpm run migration:lint       # scan up() for destructive SQL before committing
 ```
 
-CLI scripts run with `cross-env NODE_ENV=local`, so they target the local DB in `envs/.env.local`.
+The commands above pin `NODE_ENV=local`, so they always target the local DB in `envs/.env.local`.
+
+**Deploy environments** use a separate, deliberately slower path — run these *on the server* over ssh:
+
+```bash
+pnpm migrate:show:dev     # what would apply — read-only
+pnpm migrate:run:dev      # apply, after typing the env name to confirm
+pnpm migrate:revert:dev   # revert the last one (type `revert-dev`)
+```
+
+- `scripts/_db-env.sh` resolves `envs/.env.<env>`, prints the target, and refuses on a missing file.
+  Set `EXPECTED_DB_NAME` in that env file to also cross-check `DB_NAME` — it catches a prod config
+  copied into `.env.dev`. Leave it blank to skip the check.
+- Migration is deliberately **not** part of deploy: schema changes are expensive to undo, so a human
+  confirms them. Order is always migrate first, deploy second — the boot guard
+  (`assertNoPendingMigrations`) refuses to start the app if you get it backwards.
+- No tunnel script ships here, but there is a seam for one. If reaching the DB needs infra-specific
+  setup (ssh tunnel, Cloud SQL Proxy, RDS IAM token), create `scripts/db-connect.sh` — `_db-env.sh`
+  sources it after reading the env file, and anything you `export` there wins over the env values.
+  **Do not edit `_db-env.sh` itself**; infra code there collides on every boilerplate update.
+
+See `DEPLOY.md` for the recommended deploy shape and the reasoning behind it. The boilerplate ships
+no `deploy.sh` — infra differs per project — but it does ship the migration path, since without it
+there is no way to get a schema onto a deploy environment at all.
 
 ### Testing
 

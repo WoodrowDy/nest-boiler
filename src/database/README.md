@@ -33,7 +33,7 @@ pnpm db:down    # 중지 (데이터 볼륨 유지)
 pnpm db:reset   # 볼륨 삭제 후 재기동 (완전 초기화)
 ```
 
-- 포트: 호스트 **5433** → 컨테이너 5432 (시스템 Postgres(5432)와 충돌 방지)
+- 포트: 호스트 **5434** → 컨테이너 5432 (포트 충돌 방지 — 5432·5433 은 이미 쓰이고 있을 수 있다)
 - 최초 기동 시 `nest-boiler`(로컬) / `nest-boiler-test`(테스트) DB 자동 생성
 - 자격증명은 `envs/.env.docker` 단일 소스에서 주입 (compose 에 비밀번호 하드코딩 안 함)
 
@@ -93,6 +93,38 @@ pnpm run migration:create
 - 빈 마이그레이션 파일을 수동으로 생성
 - 수동으로 작업 케이스를 위해 명령어 남겨둠 추천하지는 않아요
 - 혹시 실수로 생성하셨다면, 코드에서 해당 파일을 지우고 generate 명령어로 검증해주시면 됩니다
+
+### 1.6. 커밋 전 검사
+
+```bash
+pnpm run migration:lint          # 스테이징된 마이그레이션만
+pnpm run migration:lint --all    # 전체
+```
+
+`up()` 안에서 되돌리기 어려운 구문을 찾아 보여줍니다 — `DROP COLUMN`/`DROP TABLE`,
+`RENAME`, 기존 행 처리 없는 `SET NOT NULL`, 빈 `down()`, 같은 컬럼 `DROP`+`ADD`.
+
+**막지 않고 보여줍니다.** 걸리는 것 대부분은 의도한 변경이고 판단은 사람이 합니다.
+`--strict` 를 주면 종료코드 1 로 끊습니다.
+
+### 1.7. 배포 환경에 적용하기
+
+로컬용 `migration:run` 은 항상 `envs/.env.local` 을 봅니다. 배포 환경은 **별도 경로**로,
+**서버에 ssh 로 들어가서** 돌립니다.
+
+```bash
+pnpm migrate:show:dev      # 무엇이 적용될지만 — 읽기 전용
+pnpm migrate:run:dev       # 환경명을 입력해 확인한 뒤 적용
+pnpm migrate:revert:dev    # 마지막 한 건 철회 (revert-dev 를 입력)
+```
+
+- 적용 전후 상태를 모두 보여주고, `y` 가 아니라 **환경명을 그대로 타이핑**하게 합니다.
+- TTY 가 없으면 거부합니다 — `ssh host '명령'` 으로는 확인이 무력해지기 때문입니다.
+- `envs/.env.<env>` 에 `EXPECTED_DB_NAME` 을 적어두면 `DB_NAME` 과 대조합니다.
+- DB 에 닿는 방법(터널 · 프록시 · IAM 토큰)이 필요하면 `scripts/db-connect.sh` 하나만
+  만듭니다. `scripts/_db-env.sh` 는 고치지 않습니다.
+
+> 배포 전체 흐름과 이유는 [`DEPLOY.md`](../../DEPLOY.md) 참고.
 
 ---
 
@@ -198,12 +230,26 @@ NODE_ENV=prod pnpm run seed:run
 ### Migration 명령어
 
 ```bash
-pnpm run typeorm                    # TypeORM CLI 기본
+pnpm run typeorm                    # TypeORM CLI 기본 (NODE_ENV 는 호출자가 준다)
 pnpm run migration:create           # 빈 마이그레이션 생성 (커스텀 비추천)
 pnpm run migration:generate         # 엔티티 변경사항 기반 마이그레이션 생성
 pnpm run migration:run              # 마이그레이션 실행
 pnpm run migration:revert           # 마이그레이션 되돌리기
+pnpm run migration:show             # 적용 여부 목록
+pnpm run migration:lint             # up() 의 되돌리기 어려운 구문 검사
 ```
+
+위 명령은 전부 `NODE_ENV=local` 로 고정돼 있어 로컬 DB 만 봅니다.
+
+### 배포 환경 Migration 명령어
+
+```bash
+pnpm migrate:show:dev               # 적용 예정 확인 (읽기 전용)
+pnpm migrate:run:dev                # 확인 입력 후 적용
+pnpm migrate:revert:dev             # 마지막 한 건 철회
+```
+
+`dev` 자리에 `prod` 도 됩니다. 서버에 ssh 로 들어가서 돌립니다 — 1.7 참고.
 
 ### Seed 명령어
 
@@ -278,6 +324,16 @@ pnpm run setup-db
 ## 🔍 7. 트러블슈팅
 
 ### 일반적인 문제들
+
+**Q: 서버가 안 뜨고 "적용되지 않은 마이그레이션이 있습니다" 가 나와요**
+A: 의도된 동작입니다. `pnpm run migration:run` 으로 먼저 적용하세요.
+
+스키마가 어긋나도 앱은 그냥 뜹니다. 그리고 서비스 코드의 try/catch 가 그 에러를 삼키면
+기능이 멈춰 있어도 겉으로는 아무 일 없어 보입니다. 조용히 잘못되느니 그 자리에서 죽는
+편이 낫다고 보고 `src/global/helpers/pending-migrations.helper.ts` 에서 부팅을 막습니다.
+
+배포 환경이면 `pnpm migrate:run:<env>` 입니다. 이 검사가 **마이그레이션 먼저, 배포 나중**
+이라는 순서를 강제합니다.
 
 **Q: 엔티티를 변경했는데 마이그레이션이 생성되지 않아요**
 A: 엔티티 경로 설정을 확인하고, TypeScript 컴파일 오류가 없는지 확인하세요.
