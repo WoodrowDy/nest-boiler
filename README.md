@@ -157,7 +157,7 @@ domain/<name>/
 - **데이터베이스**: PostgreSQL, TypeORM
 - **테스트**: Jest
 - **API 문서화**: Swagger
-- **배포/운영**: AWS
+- **인프라**: AWS
 
 ## API 문서
 
@@ -188,9 +188,13 @@ pnpm migration:run
 # 5) (선택) 시드 데이터 주입
 pnpm seed:run
 
-# 6) 개발 서버 실행
+# 6) 로컬 서버 실행
 pnpm run start:local
 ```
+
+> 4~5 는 `pnpm setup-db` 한 줄로도 됩니다(`migration:generate` + `run` + `seed:run`).
+> 다만 `generate` 가 먼저 도므로, 엔티티와 스키마가 어긋나 있으면 마이그레이션 파일이
+> 새로 생깁니다. 처음 받은 저장소라면 위처럼 `migration:run` 만 돌리는 편이 안전합니다.
 
 > 로컬 Postgres 는 호스트 **5434** 로 뜹니다(컨테이너 5432). 5432·5433 은 이미 쓰이고
 > 있을 수 있어 피한 값입니다. `db:up` 이 `port is already allocated` 로 실패하면
@@ -205,6 +209,13 @@ pnpm run start:local
 pnpm run start:local   # NODE_ENV=local, TZ=Asia/Seoul, --watch
 pnpm run start:dev     # NODE_ENV=dev  (envs/.env.dev 필요)
 pnpm run start:prod    # node dist/main
+
+pnpm run build         # nest build → dist/
+pnpm run typecheck     # tsc --noEmit — pre-commit 은 돌리지 않으므로 직접 친다
+pnpm run lint          # eslint --fix
+
+pnpm db:down           # 컨테이너 중지 (데이터 유지)
+pnpm db:reset          # 볼륨 삭제 후 재기동 — 스키마가 꼬였을 때
 ```
 
 > 적용되지 않은 마이그레이션이 있으면 **앱이 뜨지 않습니다.** 의도된 동작이며,
@@ -255,7 +266,24 @@ cp envs/.env.dev.example envs/.env.dev
 ## 마이그레이션 및 시드
 
 - TypeORM 마이그레이션 및 시드 데이터는 `src/database/migrations/`, `src/database/seeds/`에서 관리합니다.
-- 자세한 사용법은 `src/database/README.md`를 참고하세요.
+- 자세한 사용법은 [`src/database/README.md`](src/database/README.md)를 참고하세요.
+
+```bash
+# 로컬 — 아래는 모두 NODE_ENV=local 고정이라 envs/.env.local 만 봅니다
+pnpm migration:generate   # 엔티티 변경분으로 마이그레이션 생성 (커밋 전 SQL 리뷰!)
+pnpm migration:create     # 빈 마이그레이션 (데이터 이관·수동 SQL)
+pnpm migration:lint       # up() 의 되돌리기 어려운 구문 검사
+pnpm migration:show       # 적용 여부 목록
+pnpm migration:run        # 적용
+pnpm migration:revert     # 마지막 한 건 되돌리기
+pnpm seed:run             # MainSeeder 실행
+pnpm setup-db             # generate + run + seed 한 번에
+
+# 배포 환경 — 서버에 ssh 로 들어가서 돌립니다 (dev 자리에 prod 도 됩니다)
+pnpm migrate:show:dev     # 뭐가 적용될지만 — 읽기 전용
+pnpm migrate:run:dev      # 환경명을 입력해 확인한 뒤 적용
+pnpm migrate:revert:dev   # 마지막 한 건 철회 (revert-dev 를 입력)
+```
 
 ### 마이그레이션 규칙
 
