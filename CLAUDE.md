@@ -135,6 +135,17 @@ Documented in `README.md` and **mechanically enforced by ESLint** (`no-restricte
 - **Service returns entities/domain**, never HTTP response DTOs. Entity→Response conversion happens
   at the controller boundary via the mapper.
   → ESLint blocks importing `**/dtos/response/**` in `**/services/*.ts` and `**/repositories/*.ts`.
+  - Values the response needs but the entity lacks (computed, aggregated, joined) go into a **domain
+    result type exported from the service file** — not a DTO. It never crosses the HTTP boundary.
+  - **One `await` per controller method.** Two means the controller is orchestrating; fold it into
+    the service.
+- **Mappers copy, they do not compute.** The test: *would this code still be needed if HTTP went
+  away?* If yes, it belongs to the domain — the service builds it and the mapper takes it in one line.
+  - Listing every outgoing field by hand is the point. TS types do not exist at runtime and there is
+    no `ClassSerializerInterceptor` here, so **what you don't write doesn't ship** (closed) — safer
+    than `@Exclude` (open), where forgetting one leaks instead of omitting.
+  - → ESLint blocks `**/repositories/*`, `**/services/*`, `typeorm` and `async` in `**/mappers/*.ts`;
+    and `**/repositories/*` / `typeorm` in `**/controllers/*.ts`.
 - **Repository handles queries only.** Existence checks (404) and transaction boundaries live in the
   service. Return type is always `Entity` / `Entity[]`.
 
