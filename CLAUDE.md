@@ -15,9 +15,15 @@ pnpm run build          # Production build (nest build)
 pnpm run start:local    # Local dev server (NODE_ENV=local, TZ=Asia/Seoul, --watch)
 pnpm run start:dev      # Dev server (NODE_ENV=dev)
 pnpm run start:prod     # Production (node dist/main)
+pnpm run typecheck      # tsc --noEmit (pre-commit does NOT run this)
 pnpm run format         # Prettier
 pnpm run lint           # eslint --fix
 ```
+
+**The app refuses to boot when migrations are pending** — `assertNoPendingMigrations` in
+`src/global/helpers/pending-migrations.helper.ts`, called before `NestFactory.create`. A schema
+that lags the code still starts fine and then fails silently once a `try/catch` swallows the error,
+so it dies here instead. The message names the env, the DB and the command to run.
 
 ### Local Database (Docker)
 
@@ -113,6 +119,10 @@ src/
     seeds/         # domain seed + factory
   global/          # cross-cutting: constants, decorators, dtos, helpers, interceptors, middlewares, context, logger
   database/        # typeorm.config.ts, migrations/, seeds/main.seed.ts, entities/ (core-hard/core-soft base)
+
+scripts/           # db-up/down/reset.sh, migration-lint.sh, migrate.sh, _db-env.sh,
+                   # db-connect.sh.example (per-project DB reachability — tunnel/proxy/IAM)
+envs/              # env.ts (NODE_ENV -> file), .env.*.example (committed; .env.* are ignored)
 ```
 
 Reference implementation: **`src/domain/template/static-board/`** — copy this when adding a domain.
