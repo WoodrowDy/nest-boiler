@@ -35,7 +35,6 @@ export const StaticBoardMapper = {
     dto.id = entity.id;
     dto.createdAt = entity.createdAt;
     dto.updatedAt = entity.updatedAt;
-    dto.deletedAt = entity.deletedAt;
     dto.category = entity.category;
     dto.writer = entity.writer;
     dto.birth = entity.birth;

@@ -80,7 +80,8 @@ nest-boiler/
   - **왜 명시적 복사인가**: TypeScript 타입은 런타임에 없습니다. 반환 타입을 적어도 아무것도 걸러지지 않고, 이 레포는 `ClassSerializerInterceptor`도 쓰지 않습니다. **적지 않은 것은 나가지 않는다**(닫힘)가 `@Exclude`(열림)보다 안전합니다 — 빠뜨리면 안 나갈 뿐이고, `@Exclude`는 빠뜨리면 새어 나갑니다.
   - **Mapper는 조회하지 않습니다.** 필요한 값은 서비스가 미리 모아 인자로 넘깁니다(줄이 여럿이면 `Map`으로). 줄마다 조회하면 목록 하나에 N+1이 생깁니다.
 - **Repository는 엔티티만** 다룹니다(DTO를 모름). 반환 타입은 항상 `Entity`/`Entity[]`.
-- **공통 audit 응답 필드**(id/createdAt/updatedAt/deletedAt)는 `AuditResponse`(`src/global/dtos/audit.response.ts`) 한 곳에서 소유합니다.
+- **공통 audit 응답 필드**(id/createdAt/updatedAt)는 `AuditResponse`(`src/global/dtos/audit.response.ts`) 한 곳에서 소유합니다.
+  - **`deletedAt`은 담지 않습니다.** soft delete는 내부 구현이고 삭제된 행은 조회에서 걸러지므로 클라이언트가 받는 값은 언제나 `null`입니다. `CoreHardEntity` 도메인에는 컬럼 자체가 없어서, 여기 두면 절반의 도메인에 대해 Swagger가 거짓말을 합니다. 정말 필요한 도메인이 생기면 그 응답 DTO에 한 줄 선언합니다.
 
 ### 계층별 역할
 

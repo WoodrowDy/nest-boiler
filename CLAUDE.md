@@ -131,7 +131,10 @@ Documented in `README.md` and **mechanically enforced by ESLint** (`no-restricte
   Swagger; request/response DTOs derive via `PickType`/`PartialType`/`IntersectionType`. Do NOT
   derive DTOs from the entity.
 - **Response DTOs are pure data** (no methods). Formatting/behavior goes to a util or the mapper.
-  Audit fields (id/createdAt/updatedAt/deletedAt) come from `global/dtos/audit.response.ts`.
+  Audit fields (id/createdAt/updatedAt) come from `global/dtos/audit.response.ts`. **`deletedAt` is
+  deliberately not there** — soft delete is an implementation detail, deleted rows are filtered out
+  of reads anyway, and `CoreHardEntity` domains have no such column. A domain that genuinely needs
+  it declares one line on its own response DTO.
 - **Service returns entities/domain**, never HTTP response DTOs. Entity→Response conversion happens
   at the controller boundary via the mapper.
   → ESLint blocks importing `**/dtos/response/**` in `**/services/*.ts` and `**/repositories/*.ts`.
