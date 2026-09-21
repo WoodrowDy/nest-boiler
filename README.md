@@ -14,32 +14,50 @@
 - 본 프로젝트는 DDD 패턴을 참고하여, 도메인별로 디렉토리를 분리하여 관리합니다.
 
 ```bash
-backend-nestjs/
+nest-boiler/
 |-- src/
-|   |-- app.controller.ts
+|   |-- main.ts                   # 부팅. 미적용 마이그레이션이면 여기서 거부
 |   |-- app.module.ts
+|   |-- app.controller.ts
 |   |-- app.service.ts
-|   |-- main.ts
 |   |-- database/
-|   |   |-- config/           # 데이터베이스 설정
-|   |   |-- entity/           # 공통 엔티티
-|   |   |-- migrations/       # 마이그레이션 파일
-|   |   |-- seeds/            # 시드 데이터
+|   |   |-- config/               # typeorm.config.ts
+|   |   |-- entities/             # 공통 베이스 엔티티 (core-hard / core-soft)
+|   |   |-- migrations/           # 마이그레이션 파일 (적용 후 수정 금지)
+|   |   |-- seeds/                # main.seed.ts
+|   |   |-- README.md             # 마이그레이션 · 시드 상세 가이드
 |   |-- domain/
-|   |   |-- static-board/     # 예시 static-board 도메인
-|   |       |-- controllers/  # 컨트롤러
-|   |       |-- dtos/         # DTO
-|   |       |-- entities/     # 엔티티
-|   |       |-- repositories/ # 레포지토리
-|   |       |-- services/     # 서비스
-|   |       |-- seeds/        # 도메인별 시드
-|   |-- shared/               # 공통 모듈, 상수, 데코레이터 등
-|-- test/                     # 테스트 코드
-    |-- utils/                # 테스트 환경 변수 및 앱 실행 헬퍼 함수 등
-    |-- domain/
-        |-- fixture           # 실제 API 호출 함수 모음
-        |-- mocks             # 테스트용 목 데이터
-        |-- scenarios         # 실제 테스트 시나리오 코드
+|   |   |-- template/
+|   |   |   |-- static-board/     # 참조 구현 — 새 도메인은 이것을 복사
+|   |   |       |-- controllers/  # HTTP 경계
+|   |   |       |-- services/     # 오케스트레이션 · 트랜잭션 경계
+|   |   |       |-- repositories/ # 데이터 접근 (Entity 만 다룸)
+|   |   |       |-- entities/     # 영속성 전용
+|   |   |       |-- dtos/         # shared / request / response
+|   |   |       |-- mappers/      # Entity -> Response
+|   |   |       |-- seeds/        # 도메인 시드 + 팩토리
+|   |   |-- jwt/
+|   |-- global/                   # 횡단 관심사
+|       |-- constants/ context/ decorators/ dtos/ enums/
+|       |-- helpers/ interceptors/ interfaces/ logger/ middlewares/
+|-- scripts/
+|   |-- db-up.sh / db-down.sh / db-reset.sh   # 로컬 Postgres(docker)
+|   |-- migration-lint.sh         # up() 의 되돌리기 어려운 구문 검사
+|   |-- migrate.sh                # 배포 환경 마이그레이션 (show/run/revert)
+|   |-- _db-env.sh                # 환경 판정 · 접속 대상 표시 · DB 이름 가드
+|   |-- db-connect.sh.example     # DB 에 닿는 방법 (터널 등) — 프로젝트가 복사해 씀
+|-- envs/
+|   |-- env.ts                    # NODE_ENV 로 env 파일 선택
+|   |-- .env.*.example            # 커밋되는 템플릿 (.env.* 는 git 제외)
+|-- test/
+|   |-- utils/                    # 테스트 환경 변수 및 앱 실행 헬퍼
+|   |-- domain/
+|       |-- fixture               # 실제 API 호출 함수 모음
+|       |-- mocks                 # 테스트용 목 데이터
+|       |-- scenarios             # 실제 테스트 시나리오 코드
+|-- docker-compose.yml            # 로컬 Postgres
+|-- DEPLOY.md                     # 배포 가이드라인
+|-- CLAUDE.md                     # Claude Code 용 저장소 안내
 |-- package.json
 |-- README.md
 ```
@@ -139,7 +157,7 @@ domain/<name>/
 
 | 환경     | 바로가기                                                             |
 | -------- | -------------------------------------------------------------------- |
-| **로컬** | [Swagger (localhost)](http://localhost:3000/api-docs)                |
+| **로컬** | [Swagger (localhost)](http://localhost:8080/api-docs)                |
 | **개발** | [Swagger (dev)](https://dev-api.yourdomain.com/api-docs) (설정 필요) |
 | **운영** | [Swagger (prod)](https://api.yourdomain.com/api-docs) (설정 필요)    |
 
@@ -168,33 +186,65 @@ pnpm seed:run
 pnpm run start:local
 ```
 
+> 로컬 Postgres 는 호스트 **5434** 로 뜹니다(컨테이너 5432). 5432·5433 은 이미 쓰이고
+> 있을 수 있어 피한 값입니다. `db:up` 이 `port is already allocated` 로 실패하면
+> `docker-compose.yml` 의 `POSTGRES_PORT` 기본값을 바꾸고 `envs/.env.local` 의
+> `DB_PORT` 도 같이 맞추세요.
+>
 > DB 상세(마이그레이션/시드/도커)는 [`src/database/README.md`](src/database/README.md) 참고.
 
 ### 일반 실행
 
 ```bash
-# 로컬 서버 실행
-pnpm run start:local
-
-# 필요 시, 환경에 맞게 cross-env 활용
+pnpm run start:local   # NODE_ENV=local, TZ=Asia/Seoul, --watch
+pnpm run start:dev     # NODE_ENV=dev  (envs/.env.dev 필요)
+pnpm run start:prod    # node dist/main
 ```
+
+> 적용되지 않은 마이그레이션이 있으면 **앱이 뜨지 않습니다.** 의도된 동작이며,
+> 무엇을 해야 하는지 메시지에 나옵니다. `src/global/helpers/pending-migrations.helper.ts`
 
 ## 테스트
 
 ```bash
-# 단위 테스트
+# 단위 테스트 (DB 불필요)
+pnpm test
+
+# e2e — 로컬 Postgres 를 자동으로 띄운 뒤 실행 (pretest:local → db:up)
 pnpm run test:local
 
-# e2e 테스트
+# e2e — DB 가 이미 떠 있을 때
 pnpm run test:e2e
 
 # 커버리지
 pnpm run test:cov
 ```
 
+> `pnpm run test:local` 은 **e2e** 입니다. pre-push 훅이 이것을 돌립니다.
+
 ## 환경 변수
 
-- 환경 변수는 `envs/` 디렉토리 및 `.env` 파일을 통해 관리합니다.
+환경은 `local | dev | prod | test` 네 가지이며, `NODE_ENV` 값으로 `envs/` 아래 파일이
+선택됩니다(`envs/env.ts`).
+
+| 파일 | 용도 | git |
+|---|---|---|
+| `envs/.env.local` | 로컬 개발 | 제외 |
+| `envs/.env.test` | e2e | 커밋됨 |
+| `envs/.env.dev` · `.env.prod` | 배포 환경 — **서버에만 둡니다** | 제외 |
+| `envs/.env.docker` | 로컬 Postgres 컨테이너 자격증명 | 제외 |
+| `envs/.env.*.example` | 템플릿 | 커밋됨 |
+
+`.env.*` 는 git 에서 제외하고 `.env.*.example` 만 커밋합니다. 새 환경을 쓸 때는
+example 을 복사해 값을 채웁니다.
+
+```bash
+cp envs/.env.dev.example envs/.env.dev
+```
+
+**`EXPECTED_DB_NAME`** (선택) — 배포 환경 env 에 적어두면 마이그레이션 전에 `DB_NAME` 과
+대조합니다. prod 설정을 `.env.dev` 에 잘못 복사한 경우를 잡습니다. 비우면 검사하지 않고
+접속 대상만 보여줍니다.
 
 ## 마이그레이션 및 시드
 
@@ -205,6 +255,7 @@ pnpm run test:cov
 
 - **생성 방식 구분**: 엔티티 스키마 변경 → `pnpm migration:generate`(자동 생성), 데이터 이관·수동 SQL → `pnpm migration:create`(빈 파일 직접 작성).
 - **자동 생성물은 반드시 리뷰**: `migration:generate` 결과를 그대로 믿지 말고 up/down SQL을 확인한 뒤 커밋합니다.
+- **`pnpm migration:lint` 로 한 번 거릅니다**: `up()` 안의 `DROP COLUMN`/`DROP TABLE`·`RENAME`·기존 행 처리 없는 `SET NOT NULL`·빈 `down()`·같은 컬럼 `DROP`+`ADD` 를 찾아 보여줍니다. **막지 않고 보여주며 판단은 사람이 합니다**(위의 리뷰 규칙을 기계가 거드는 것). 인자 없이 쓰면 스테이징된 것만, `--all` 이면 전체입니다.
 - **단순 컬럼 변경은 `ALTER`(modify) 우선**: 단순 변경인데 `DROP`+`ADD`(데이터 손실)로 생성됐다면, 룰에 저촉되지 않는 한 in-place `ALTER`로 손수 고칩니다. (TypeORM 자동 판단이라 사람이 리뷰하는 영역)
 - **적용된 마이그레이션은 사후 수정 금지**: 이미 반영된 파일은 고치지 말고 항상 **새 마이그레이션**으로 보정합니다(협업·운영 일관성). VS Code에서는 `src/database/migrations/**`가 **읽기전용**(`.vscode/settings.json`의 `files.readonlyInclude`)이라, 실수로 편집하려 하면 에디터가 막습니다. 정말 고쳐야 하면(예: 생성된 마이그레이션의 `DROP`+`ADD`를 `ALTER`로) **읽기전용을 명시적으로 해제**한 뒤 편집 — 편집 순간의 "정말 할거냐?" 확인 역할.
 - **prod는 `synchronize: false` 유지**: 스키마는 오직 마이그레이션으로만 변경합니다(`typeorm.config.ts`).
