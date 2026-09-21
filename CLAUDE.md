@@ -62,8 +62,10 @@ pnpm migrate:revert:dev   # revert the last one (type `revert-dev`)
 - Migration is deliberately **not** part of deploy: schema changes are expensive to undo, so a human
   confirms them. Order is always migrate first, deploy second — the boot guard
   (`assertNoPendingMigrations`) refuses to start the app if you get it backwards.
-- No tunnel script ships here. The server is already inside the VPC; if you need a remote DB from a
-  laptop, that is infra-specific (bastion / VPN / IP allowlist) — set it up per project.
+- No tunnel script ships here, but there is a seam for one. If reaching the DB needs infra-specific
+  setup (ssh tunnel, Cloud SQL Proxy, RDS IAM token), create `scripts/db-connect.sh` — `_db-env.sh`
+  sources it after reading the env file, and anything you `export` there wins over the env values.
+  **Do not edit `_db-env.sh` itself**; infra code there collides on every boilerplate update.
 
 See `DEPLOY.md` for the recommended deploy shape and the reasoning behind it. The boilerplate ships
 no `deploy.sh` — infra differs per project — but it does ship the migration path, since without it

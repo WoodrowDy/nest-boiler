@@ -36,6 +36,22 @@ DB_PORT="$(_read_env DB_PORT)"
 DB_NAME="$(_read_env DB_NAME)"
 EXPECTED_DB_NAME="$(_read_env EXPECTED_DB_NAME)"
 
+# ★ DB 에 닿는 방법은 인프라마다 다르다 — ssh 터널 · cloud-sql-proxy · IAM 토큰.
+#   그 부분만 scripts/db-connect.sh 로 갈아끼운다. 이 파일은 고치지 않는다.
+#
+#   보일러를 업데이트할 때 프로젝트 코드와 충돌하지 않게 하려는 것이다. 여기를 직접
+#   고치기 시작하면 다음 업데이트마다 그 자리가 부딪힌다.
+#
+#   ★ env 를 읽은 뒤에 부른다. 그래야 그 값을 보고 터널을 뚫을 수 있고, 덮어쓴 값이
+#     살아남는다. 순서가 반대면 _read_env 가 터널이 잡은 포트를 지워버린다.
+#
+#   ★ 덮어쓸 때는 반드시 export 해야 한다. 실제 접속은 자식 프로세스(typeorm)가 하고,
+#     dotenv 는 이미 있는 process.env 를 덮지 않으므로 export 한 값이 이긴다.
+if [ -f scripts/db-connect.sh ]; then
+  # shellcheck disable=SC1091  # 프로젝트가 두는 선택 파일이라 정적 분석이 못 따라간다
+  . scripts/db-connect.sh
+fi
+
 if [ -z "$DB_HOST" ] || [ -z "$DB_NAME" ]; then
   echo "✗ ${ENV_FILE} 에 DB_HOST 또는 DB_NAME 이 비어 있습니다."
   exit 1
