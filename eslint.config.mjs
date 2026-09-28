@@ -119,8 +119,8 @@ export default [
     },
   },
   {
-    // 서비스/레포 = 응답 DTO를 만들지 않음(변환은 컨트롤러 경계 Mapper)
-    files: ["**/services/*.ts", "**/repositories/*.ts"],
+    // 영속성 어댑터/레포 = 응답 DTO를 만들지 않음(변환은 컨트롤러 경계 Mapper)
+    files: ["**/repositories/*.ts", "**/adapters/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -128,8 +128,41 @@ export default [
           patterns: [
             {
               group: ["**/dtos/response/*", "**/dto/response/*"],
-              message: "서비스/레포는 엔티티를 반환 — 응답 DTO 변환은 컨트롤러 경계(Mapper)에서",
+              message: "어댑터는 엔티티를 반환 — 응답 DTO 변환은 컨트롤러 경계(Mapper)에서",
             },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // 서비스/포트 = 안쪽. ORM 도 구현도 모른다.
+    //
+    // ★ 여기가 막혀 있어야 포트가 이름값을 한다.
+    //   서비스가 EntityManager 하나만 알아도 추상화는 그 순간 뚫린다 —
+    //   트랜잭션 경계는 TransactionPort 로, 조회/저장은 도메인 포트로 말한다.
+    files: ["**/services/*.ts", "**/ports/*.ts", "**/*.port.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/dtos/response/*", "**/dto/response/*"],
+              message: "서비스는 엔티티를 반환 — 응답 DTO 변환은 컨트롤러 경계(Mapper)에서",
+            },
+            {
+              group: ["**/adapters/**"],
+              message: "서비스는 포트에 의존 — 구현은 모듈이 꽂는다",
+            },
+            {
+              group: ["**/dtos/request/*", "**/dto/request/*"],
+              message: "서비스는 전송 타입을 모른다 — 커맨드로 옮겨서 넘긴다",
+            },
+          ],
+          paths: [
+            { name: "typeorm", message: "서비스/포트는 ORM 을 모른다 — 어댑터 뒤에 둔다" },
+            { name: "@nestjs/typeorm", message: "서비스/포트는 ORM 을 모른다 — 어댑터 뒤에 둔다" },
           ],
         },
       ],
@@ -148,7 +181,7 @@ export default [
         {
           patterns: [
             {
-              group: ["**/repositories/*", "**/services/*"],
+              group: ["**/repositories/*", "**/services/*", "**/adapters/**", "**/ports/*"],
               message: "매퍼는 무상태 — 조회가 필요하면 서비스가 모아서 인자로 넘긴다",
             },
           ],
@@ -180,7 +213,7 @@ export default [
         {
           patterns: [
             {
-              group: ["**/repositories/*"],
+              group: ["**/repositories/*", "**/adapters/**"],
               message: "컨트롤러는 서비스를 통한다 — 트랜잭션 경계와 존재 검사가 서비스에 있다",
             },
           ],
