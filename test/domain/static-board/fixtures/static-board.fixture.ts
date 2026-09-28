@@ -11,4 +11,12 @@ export const StaticBoardFixture = {
   async getStaticBoard(app, id): Promise<Response> {
     return await request(app.getHttpServer()).get(`/static-boards/${id}`);
   },
+
+  async modifyStaticBoard(app, id, body: any): Promise<Response> {
+    return await request(app.getHttpServer()).patch(`/static-boards/${id}`).send(body);
+  },
+
+  async removeStaticBoard(app, id): Promise<Response> {
+    return await request(app.getHttpServer()).delete(`/static-boards/${id}`);
+  },
 };
