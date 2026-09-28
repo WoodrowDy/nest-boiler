@@ -75,8 +75,8 @@ async function bootstrap() {
   /**
    * GlobalFilters
    */
-  // TODO(P1): 전역 예외 필터 — 에러 응답 통일({ success:false, error, meta:{traceId} })
-  //           + DB 에러코드 매핑(unique→409 등). 상세: docs/TODO.md
+  // 도메인 예외 필터는 AppModule 에 APP_FILTER 로 등록되어 있다 — e2e 에도 같이 걸리도록.
+  // TODO(P1): DB 에러코드 매핑(unique→409 등)과 성공/실패 응답 봉투 통일. 상세: docs/TODO.md
 
   /**
    * DB

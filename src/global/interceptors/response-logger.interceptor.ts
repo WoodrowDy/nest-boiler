@@ -1,14 +1,8 @@
-import {
-  CallHandler,
-  ExecutionContext,
-  HttpException,
-  Inject,
-  Injectable,
-  NestInterceptor,
-} from "@nestjs/common";
+import { CallHandler, ExecutionContext, Inject, Injectable, NestInterceptor } from "@nestjs/common";
 import { Request } from "express";
 import { Observable, tap } from "rxjs";
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from "nest-winston";
+import { resolveHttpStatus } from "../filters/http-status.resolver";
 
 /**
  * 응답(access) 로그 인터셉터.
@@ -41,12 +35,11 @@ export class ResponseLoggerInterceptor implements NestInterceptor {
 
     const durationMs = Date.now() - start;
 
-    let status: number;
-    if (err) {
-      status = err instanceof HttpException ? err.getStatus() : 500;
-    } else {
-      status = context.switchToHttp().getResponse().statusCode;
-    }
+    // 예외일 때의 상태코드는 응답 필터와 같은 표를 본다(http-status.resolver).
+    // 여기서 따로 판단하면 클라이언트는 404, 로그는 500 이 되어 알림이 잘못 운다.
+    const status: number = err
+      ? resolveHttpStatus(err)
+      : context.switchToHttp().getResponse().statusCode;
 
     const message = `[${req.method}]${req.originalUrl} ${status} ${durationMs}ms`;
     const ctx = "HTTP RES";

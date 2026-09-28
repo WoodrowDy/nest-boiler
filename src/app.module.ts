@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
-import { APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { ResponseLoggerInterceptor } from "./global/interceptors/response-logger.interceptor";
@@ -15,6 +15,8 @@ import { RequestLoggerMiddleware } from "./global/middlewares/request-logger.mid
 import { WinstonModule } from "nest-winston";
 import { winstonConfig } from "./global/logger/winston.config";
 import { JwtModule } from "./domain/jwt/jwt.module";
+import { TransactionModule } from "./global/transaction/transaction.module";
+import { DomainExceptionFilter } from "./global/filters/domain-exception.filter";
 import { StaticBoardModule } from "./domain/template/static-board/static-board.module";
 
 @Module({
@@ -60,6 +62,8 @@ import { StaticBoardModule } from "./domain/template/static-board/static-board.m
     JwtModule.forRoot({
       jwtSecret: process.env.JWT_SECRET,
     }),
+    // 트랜잭션 포트에 TypeORM 구현을 꽂는다 (@Global)
+    TransactionModule,
     //Templates
     StaticBoardModule,
   ],
@@ -68,6 +72,9 @@ import { StaticBoardModule } from "./domain/template/static-board/static-board.m
     AppService,
     // 전역 응답 로그(상태코드+소요시간). traceId 는 winston 포맷에서 자동 부착
     { provide: APP_INTERCEPTOR, useClass: ResponseLoggerInterceptor },
+    // 도메인 예외(DomainError) → HTTP 번역.
+    // ★ main.ts 가 아니라 모듈에 둔다 — bootstrap 을 거치지 않는 e2e 에도 같이 적용되게.
+    { provide: APP_FILTER, useClass: DomainExceptionFilter },
   ],
 })
 export class AppModule implements NestModule {
