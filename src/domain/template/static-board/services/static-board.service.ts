@@ -1,127 +1,86 @@
-import { Injectable } from "@nestjs/common";
-import { DataSource, EntityManager } from "typeorm";
-import { StaticBoardRepository } from "../repositories/static-board.repository";
-import { GenerateStaticBoardPayload } from "../dtos/request/generate-static-board.dto";
-import { GetStaticBoardQuery } from "../dtos/request/get-static-board.dto";
-import { Pagination } from "src/global/decorators/pagination-query.decorator";
+import { Inject, Injectable } from "@nestjs/common";
 import { StaticBoard } from "../entities/static-board.entity";
-import { ModifyStaticBoardPayload } from "../dtos/request/modify-static-board.dto";
+import { STATIC_BOARD_PORT, StaticBoardPort } from "../ports/static-board.port";
+import {
+  CreateStaticBoardCommand,
+  PageRequest,
+  StaticBoardCriteria,
+  UpdateStaticBoardCommand,
+} from "../commands/static-board.command";
+import { Transaction } from "src/global/transaction/transaction.port";
+import { NotFoundDomainError } from "src/global/errors/domain.error";
+import { constants } from "../static-board.constants";
 
 /**
- * 애플리케이션 서비스 — 흐름 조율.
- * - 입력: request payload/query. 출력: 엔티티(도메인). HTTP 응답 DTO 는 만들지 않는다.
- * - 엔티티→응답 변환은 컨트롤러 경계에서 StaticBoardMapper 로 처리.
- * - 모든 접근이 서비스 레이어를 거치고, 원자성이 필요한 호출자는 manager를 넘겨준다" — 이 두 가지가 지켜지면 트랜잭션 처리 문제 없다.
+ * 애플리케이션 서비스 — 유스케이스 조율.
  *
- * 트랜잭션 규약(쓰기 메서드):
- * - 외부 tx(transactionManager)를 받으면 그대로 합류해 실행하고 끝낸다. commit/rollback/release 는 소유자(호출자) 몫.
- * - 외부 tx 가 없을 때: 단건(INSERT 1회)은 그 자체로 원자적이라 트랜잭션을 열지 않고(generate),
- *   다단계(존재검증+쓰기)는 새 queryRunner 로 connect→start→commit/rollback→release 를 스스로 책임진다(modify/remove).
+ * ★ 이 파일에는 typeorm 이 없다. 포트 하나와 불투명한 트랜잭션 핸들만 안다.
+ *   그래서 DB 없이 세울 수 있고, 단위 테스트가 도커를 요구하지 않는다.
+ *
+ * 트랜잭션 규약:
+ * - 모든 메서드가 transaction 을 선택적으로 받아 그대로 포트에 넘긴다.
+ *   다른 유스케이스가 이 메서드들을 자기 트랜잭션에 합류시킬 수 있다.
+ * - 스스로는 트랜잭션을 열지 않는다. 각 메서드가 단일 문장으로 끝나기 때문이다.
+ *   여러 서비스를 한 묶음으로 커밋해야 하는 호출자가 TransactionPort 로 경계를 연다:
+ *
+ *     await this.transaction.run(async (tx) => {
+ *       await this.staticBoardService.modifyStaticBoard(id, command, tx);
+ *       await this.otherService.doSomething(tx);
+ *     });
  */
 @Injectable()
 export class StaticBoardService {
   constructor(
-    private readonly staticBoardRepository: StaticBoardRepository,
-    private readonly dataSource: DataSource
+    @Inject(STATIC_BOARD_PORT)
+    private readonly staticBoards: StaticBoardPort
   ) {}
 
   async generateStaticBoard(
-    payload: GenerateStaticBoardPayload,
-    transactionManager?: EntityManager
+    command: CreateStaticBoardCommand,
+    transaction?: Transaction
   ): Promise<StaticBoard> {
-    // 단건(단일 INSERT)은 그 자체로 원자적 → 트랜잭션을 열지 않는다.
-    // 외부 tx 있으면 그 manager 로 합류, 없으면 repo 가 자기 manager(transactionManager ?? this.manager)로 실행.
-    return this.staticBoardRepository.createStaticBoard(payload, transactionManager);
-
-    // ── 참고(예시): 만약 트랜잭션으로 감싸야 한다면(다단계 등) modify/remove 처럼 아래 형태로 ──
-    // if (transactionManager) {
-    //   // 외부 tx 는 그대로 합류 — commit/rollback/release 는 소유자 몫
-    //   return this.staticBoardRepository.createStaticBoard(payload, transactionManager);
-    // }
-    // const queryRunner = this.dataSource.createQueryRunner();
-    // await queryRunner.connect();
-    // await queryRunner.startTransaction();
-    // try {
-    //   const result = await this.staticBoardRepository
-    //     .createStaticBoard(payload, queryRunner.manager);
-    //   await queryRunner.commitTransaction();
-    //   return result;
-    // } catch (error) {
-    //   await queryRunner.rollbackTransaction();
-    //   throw error;
-    // } finally {
-    //   await queryRunner.release();
-    // }
+    return this.staticBoards.create(command, transaction);
   }
 
   async getStaticBoard(
-    query: GetStaticBoardQuery,
-    transactionManager?: EntityManager
+    criteria: StaticBoardCriteria,
+    transaction?: Transaction
   ): Promise<StaticBoard> {
-    return this.staticBoardRepository.findStaticBoard(query, transactionManager);
+    const staticBoard = await this.staticBoards.findOne(criteria, transaction);
+
+    if (!staticBoard) {
+      throw new NotFoundDomainError(constants.errorMessages.FAIL_TO_FIND_STATIC_BOARD);
+    }
+
+    return staticBoard;
   }
 
   async getStaticBoardListAndCount(
-    query: GetStaticBoardQuery,
-    pagination: Pagination,
-    transactionManager?: EntityManager
+    criteria: StaticBoardCriteria,
+    page: PageRequest,
+    transaction?: Transaction
   ): Promise<{ list: StaticBoard[]; count: number }> {
-    return this.staticBoardRepository.findStaticBoardListAndCount(
-      query,
-      pagination,
-      transactionManager
-    );
+    return this.staticBoards.findListAndCount(criteria, page, transaction);
   }
 
   async modifyStaticBoard(
     id: number,
-    payload: ModifyStaticBoardPayload,
-    transactionManager?: EntityManager
+    command: UpdateStaticBoardCommand,
+    transaction?: Transaction
   ): Promise<void> {
-    // 외부 tx 를 받았으면 존재검증 + 수정을 그 tx 안에서 실행 — commit/rollback/release 는 소유자 몫.
-    if (transactionManager) {
-      await this.getStaticBoard({ id }, transactionManager);
-      await this.staticBoardRepository.updateStaticBoard(id, payload, transactionManager);
-      return;
-    }
+    // 존재 확인과 수정이 한 문장이다 — 그 사이에 끼어들 틈이 없으므로 트랜잭션이 필요 없다.
+    const affected = await this.staticBoards.update(id, command, transaction);
 
-    // 없으면 새 트랜잭션으로 존재검증 + 수정을 한 트랜잭션에 묶는다.
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      await this.getStaticBoard({ id }, queryRunner.manager);
-      await this.staticBoardRepository.updateStaticBoard(id, payload, queryRunner.manager);
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
+    if (!affected) {
+      throw new NotFoundDomainError(constants.errorMessages.FAIL_TO_FIND_STATIC_BOARD);
     }
   }
 
-  async removeStaticBoard(id: number, transactionManager?: EntityManager): Promise<void> {
-    // 외부 tx 를 받았으면 존재검증 + 삭제를 그 tx 안에서 실행 — commit/rollback/release 는 소유자 몫.
-    if (transactionManager) {
-      await this.getStaticBoard({ id }, transactionManager);
-      await this.staticBoardRepository.deleteStaticBoard(id, transactionManager);
-      return;
-    }
+  async removeStaticBoard(id: number, transaction?: Transaction): Promise<void> {
+    const affected = await this.staticBoards.softDelete(id, transaction);
 
-    // 없으면 새 트랜잭션으로 존재검증 + 삭제를 한 트랜잭션에 묶는다.
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      await this.getStaticBoard({ id }, queryRunner.manager);
-      await this.staticBoardRepository.deleteStaticBoard(id, queryRunner.manager);
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
+    if (!affected) {
+      throw new NotFoundDomainError(constants.errorMessages.FAIL_TO_FIND_STATIC_BOARD);
     }
   }
 }

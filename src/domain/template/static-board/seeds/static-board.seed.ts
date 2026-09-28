@@ -1,16 +1,18 @@
 import { DataSource } from "typeorm";
 import { Seeder, SeederFactoryManager } from "typeorm-extension";
-import { StaticBoardRepository } from "../repositories/static-board.repository";
+import { TypeOrmStaticBoardAdapter } from "../adapters/persistence/typeorm-static-board.adapter";
 import { StaticBoard } from "../entities/static-board.entity";
+import { toTransaction } from "src/global/transaction/transaction.bridge";
 import { normalizePhone } from "src/global/helpers/phone.helper";
 
 export class StaticBoardSeeder implements Seeder {
   public async run(dataSource: DataSource, factoryManager: SeederFactoryManager) {
-    //방식 1: Repository 패턴으로 고정 데이터 생성
-    const staticBoardRepository = new StaticBoardRepository(dataSource);
+    // 방식 1: 포트 구현(어댑터)으로 고정 데이터 생성 — 서비스와 같은 계약을 쓴다.
+    const staticBoards = new TypeOrmStaticBoardAdapter(dataSource.getRepository(StaticBoard));
 
     await dataSource.transaction(async (transactionManager) => {
-      await staticBoardRepository.createStaticBoard(
+      // 시더는 Nest 밖에서 돌므로 트랜잭션 핸들을 직접 만들어 넘긴다.
+      await staticBoards.create(
         {
           birth: new Date("2000-10-10"),
           body: "초기 seed 목업 내용",
@@ -19,7 +21,7 @@ export class StaticBoardSeeder implements Seeder {
           writer: "김작가",
           phone: normalizePhone("010-1234-5678"),
         },
-        transactionManager
+        toTransaction(transactionManager)
       );
     });
 

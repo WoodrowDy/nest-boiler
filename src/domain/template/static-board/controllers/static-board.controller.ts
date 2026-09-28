@@ -11,9 +11,10 @@ import { PaginatedQuery, Pagination } from "src/global/decorators/pagination-que
 import { ModifyStaticBoardPayload } from "../dtos/request/modify-static-board.dto";
 
 /**
- * HTTP 경계.
- * - 입력: request DTO(payload/query). 출력: response DTO.
- * - 엔티티→응답 변환은 이 경계에서 StaticBoardMapper 로 수행한다.
+ * HTTP 인바운드 어댑터.
+ * - 들어올 때: request DTO → 커맨드/조회조건 (StaticBoardMapper)
+ * - 나갈 때:   엔티티 → response DTO (StaticBoardMapper)
+ * - 서비스는 이 파일이 사라져도 그대로 동작한다. 그것이 어댑터라는 뜻이다.
  */
 @Controller(`static-boards`)
 export class StaticBoardController {
@@ -28,7 +29,9 @@ export class StaticBoardController {
   async postStaticBoard(
     @Body() payload: GenerateStaticBoardPayload
   ): Promise<ObjectResponse<StaticBoardResponse>> {
-    const staticBoard = await this.staticBoardService.generateStaticBoard(payload);
+    const staticBoard = await this.staticBoardService.generateStaticBoard(
+      StaticBoardMapper.toCreateCommand(payload)
+    );
 
     return new ObjectResponse(StaticBoardMapper.toResponse(staticBoard));
   }
@@ -45,7 +48,7 @@ export class StaticBoardController {
     @PaginatedQuery() pagination: Pagination
   ): Promise<ListResponse<StaticBoardResponse[]>> {
     const { list, count } = await this.staticBoardService.getStaticBoardListAndCount(
-      query,
+      StaticBoardMapper.toCriteria(query),
       pagination
     );
 
@@ -73,7 +76,7 @@ export class StaticBoardController {
     @Param("id") id: number,
     @Body() payload: ModifyStaticBoardPayload
   ): Promise<void> {
-    await this.staticBoardService.modifyStaticBoard(id, payload);
+    await this.staticBoardService.modifyStaticBoard(id, StaticBoardMapper.toUpdateCommand(payload));
   }
 
   @ApiDoc({
