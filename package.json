@@ -33,7 +33,7 @@
     "migration:revert": "cross-env NODE_ENV=local pnpm run typeorm migration:revert",
     "seed:run": "cross-env NODE_ENV=local ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./src/database/config/typeorm.config.ts",
     "seed:revert": "cross-env NODE_ENV=local ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:revert -d ./src/database/config/typeorm.config.ts",
-    "setup-db": "pnpm run migration:generate && pnpm run migration:run && pnpm run seed:run",
+    "setup-db": "pnpm run migration:run && pnpm run seed:run",
     "prepare": "husky",
     "migration:show": "cross-env NODE_ENV=local pnpm run typeorm migration:show",
     "migrate:show:dev": "bash scripts/migrate.sh dev show",

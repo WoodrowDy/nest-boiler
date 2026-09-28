@@ -48,7 +48,7 @@ pnpm run migration:create     # empty migration (manual/data changes)
 pnpm run migration:run        # apply
 pnpm run migration:revert     # revert last
 pnpm run seed:run             # run MainSeeder
-pnpm run setup-db             # generate + run + seed
+pnpm run setup-db             # run + seed (신규 DB 셋업)
 pnpm run migration:lint       # scan up() for destructive SQL before committing
 ```
 
