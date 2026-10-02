@@ -113,15 +113,29 @@ async function bootstrap() {
    * swagger
    */
 
+  /**
+   * ★ local 이 아니면 문서를 Basic 인증 뒤에 둔다.
+   *
+   *   경로는 SWAGGER_PATH 다. 전에는 SWAGGER_VERSION("1.0") 에 걸고 있어서
+   *   /api-docs 와 맞지 않아 보호가 **전혀 걸리지 않았다** — 코드만 보면 걸린 것처럼 보인다.
+   *
+   *   자격증명은 env 에서 읽는다. 소스에 두면 저장소를 받은 사람이 그대로 본다.
+   *   비어 있으면 띄우지 않는다 — 빠뜨린 채 뜨면 문서가 무방비로 열리는데,
+   *   그것은 "틀린 채로도 정상으로 보이는" 부류라 부팅에서 막는다.
+   */
   if (process.env.NODE_ENV !== commonConstants.props.nodeEnvs.LOCAL) {
+    const swaggerUser = process.env.SWAGGER_USER;
+    const swaggerPassword = process.env.SWAGGER_PASSWORD;
+
+    if (!swaggerUser || !swaggerPassword) {
+      throw new Error(
+        `SWAGGER_USER · SWAGGER_PASSWORD required — NODE_ENV="${process.env.NODE_ENV}"`
+      );
+    }
+
     app.use(
-      [swaggerConstants.props.SWAGGER_VERSION],
-      basicAuth({
-        challenge: true,
-        users: {
-          [swaggerConstants.props.SWAGGER_USER]: swaggerConstants.props.SWAGGER_PASSWORD,
-        },
-      })
+      swaggerConstants.props.SWAGGER_PATH,
+      basicAuth({ challenge: true, users: { [swaggerUser]: swaggerPassword } })
     );
   }
 
