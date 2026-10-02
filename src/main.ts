@@ -11,6 +11,7 @@ import basicAuth from "express-basic-auth";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { WINSTON_MODULE_NEST_PROVIDER } from "nest-winston";
 import { assertNoPendingMigrations } from "./global/helpers/pending-migrations.helper";
+import { HttpExceptionFilter } from "./global/filters/http-exception.filter";
 
 async function bootstrap() {
   // 스키마가 코드보다 뒤쳐진 채로 뜨지 않게 한다. 앱을 만들기 전에 본다.
@@ -76,18 +77,12 @@ async function bootstrap() {
   /**
    * GlobalFilters
    */
-  // TODO(P1): 전역 예외 필터 — 에러 응답 통일({ success:false, error, meta:{traceId} })
-  //           + DB 에러코드 매핑(unique→409 등). 상세: docs/TODO.md
-
   /**
-   * DB
+   * 전역 예외 필터 — 모든 에러 응답에 meta(traceId·timestamp)를 붙인다.
+   * 제약 위반(unique·FK)은 409 로 옮기고, 그 외 DB 에러는 500 으로 둔다.
    */
-  // const dataSource = app.get<DataSource>(DataSource);
+  app.useGlobalFilters(new HttpExceptionFilter());
 
-  // TODO: filter 수정.
-  // app.useGlobalFilters(
-  //   new HttpExceptionFilter(logger, dataSource, app.get(SlackService)),
-  // );
   app.enableShutdownHooks();
 
   /**

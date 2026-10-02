@@ -5,7 +5,7 @@
  * - 업무 규칙 위반(중복, 사용 중 삭제)은 catch 한 자리에서 도메인 예외로 바꾼다.
  * - 그 외(연결 끊김, 타임아웃 등)는 잡지 않고 그대로 올린다.
  *
- * TypeORM 0.3 의 QueryFailedError 는 드라이버 에러의 code 를 그대로 가진다.
+ * TypeORM 의 QueryFailedError 는 드라이버 에러의 code 를 그대로 가진다 (1.1.1 에서 확인).
  */
 const PG_UNIQUE_VIOLATION = "23505";
 const PG_FOREIGN_KEY_VIOLATION = "23503";
