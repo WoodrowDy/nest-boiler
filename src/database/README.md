@@ -187,13 +187,16 @@ pnpm run seed:run
 - MainSeeder를 통해 모든 등록된 시드 실행
 - 적용이 제대로 되었다면 커맨드 실행 후, 스크립트 확인 가능
 
-### 2.5. 시드 되돌리기
+### 2.5. 시드 되돌리기 — 없습니다
+
+`seed:revert` 는 제공하지 않습니다. typeorm-extension 4 부터 되돌리기가 CLI 전용인데,
+이 프로젝트는 CLI 를 쓰지 않고 `runSeeders` 를 직접 부릅니다(`src/database/seeds/run.ts`).
+
+로컬에서 시드를 다시 깔려면 **DB 를 비우고 처음부터** 돌립니다.
 
 ```bash
-pnpm run seed:revert
+pnpm db:reset && pnpm migration:run && pnpm seed:run
 ```
-
-- 시드로 생성된 데이터를 되돌리기 (제한적)
 
 ---
 
@@ -211,17 +214,49 @@ pnpm run setup-db
 2. `migration:run` - 마이그레이션 적용
 3. `seed:run` - 모든 시드 실행 (MainSeeder)
 
-### 3.2. 환경별 실행
+### 3.2. 시드는 로컬 전용입니다
 
 ```bash
-# 로컬 환경 (더미 데이터 포함)
-NODE_ENV=local pnpm run seed:run
-
-# prod (필수 데이터만 — 시드 팩토리의 랜덤 데이터는 가드에 걸려 돌지 않는다)
-NODE_ENV=prod pnpm run seed:run
+pnpm run seed:run     # 항상 envs/.env.local 을 봅니다
 ```
 
+**앞에 `NODE_ENV` 를 붙여도 바뀌지 않습니다.** 스크립트 안에 `cross-env NODE_ENV=local`
+이 박혀 있고, `cross-env` 가 자식 프로세스의 값을 덮어쓰기 때문입니다.
+
+```bash
+NODE_ENV=prod pnpm run seed:run   # ← 그래도 local 로 돕니다
+```
+
+이것이 위험한 이유는 **겉으로는 성공해 보이기 때문**입니다. prod 를 겨냥했다고 믿은 채
+로컬 DB 에 시드가 들어가고, 팩토리 가드(`NODE_ENV !== "prod"`)도 통과해 랜덤 더미까지
+생성됩니다.
+
+### 배포 환경 시드를 일부러 만들지 않았습니다
+
+**기술적으로 못 하는 것이 아닙니다.** `cross-env` 를 떼고 호출자가 `NODE_ENV` 를 주게
+하면 됩니다 — 마이그레이션이 정확히 그 구조입니다.
+
+```
+typeorm        cross-env 없음                        호출자가 NODE_ENV 를 준다
+migration:run  cross-env NODE_ENV=local pnpm run typeorm ...   로컬 고정
+migrate.sh     NODE_ENV="$ENV" pnpm run typeorm ...            환경 지정
+```
+
+**열지 않은 이유는 가드 때문입니다.** `migrate.sh` 는 붙기 전에 접속 대상을 크게 찍고,
+환경명을 그대로 타이핑하게 하고, TTY 가 없으면 거부합니다. 시드에서 `cross-env` 만 떼면
+그 가드 없이 `NODE_ENV=prod pnpm run seed` 한 줄로 **운영 DB 에 시드가 들어갑니다.**
+확인 절차가 없는 만큼 지금보다 위험해집니다.
+
+필요해지면 `migrate.sh` 와 같은 가드를 단 `seed.sh` 를 두는 것이 맞습니다. 다만 그 전에
+**운영에 시드를 돌릴 일이 실제로 있는지**를 먼저 보세요 — 코드 테이블 같은 필수 참조
+데이터는 대개 마이그레이션에 넣습니다. 순서와 되돌리기가 스키마와 함께 관리되고,
+부팅 가드가 누락을 잡아줍니다(8장 참고).
+
 > 환경값은 이 프로젝트 기준 `local | dev | prod | test` 입니다(`development`/`production` 아님).
+
+> **필수 데이터와 더미의 구분은 `NODE_ENV` 가 아니라 시더 코드가 합니다.**
+> `static-board.seed.ts` 가 `NODE_ENV !== "prod"` 일 때만 팩토리를 돌립니다 — 로컬에서
+> 그 분기를 시험하려면 시더를 직접 고쳐야 합니다.
 
 ---
 
@@ -254,9 +289,10 @@ pnpm migrate:revert:dev             # 마지막 한 건 철회
 ### Seed 명령어
 
 ```bash
-pnpm run seed:run                   # 모든 시드 실행 (MainSeeder)
-pnpm run seed:revert                # 시드 되돌리기
+pnpm run seed:run                   # 모든 시드 실행 (MainSeeder). 항상 local 이다
 ```
+
+> 되돌리기는 없습니다 — 2.5 참고.
 
 ### 통합 명령어
 

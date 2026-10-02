@@ -26,8 +26,12 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 # 어느 DB 에 붙는지 눈에 보여준다. 암호는 찍지 않는다.
+# ★ 끝의 `|| true` 가 필요하다.
+#   키가 없으면 grep 이 1 을 반환하고, pipefail 때문에 파이프 전체가 1 이 된다.
+#   set -e 아래에서는 그 대입문이 실패로 간주돼 스크립트가 **메시지 없이** 끝난다.
+#   EXPECTED_DB_NAME 은 선택 항목이라 없는 것이 정상이므로, 없으면 빈 값으로 둔다.
 _read_env() {
-  grep -E "^${1}=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'"
+  grep -E "^${1}=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true
 }
 
 DB_HOST="$(_read_env DB_HOST)"

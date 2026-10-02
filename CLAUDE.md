@@ -252,7 +252,17 @@ backlog item; until then unexpected errors use Nest's default 500 response.
     destructive `DROP`+`ADD` for something that could be an `ALTER`, hand-fix it (unless intentional).
     This is a human review call, not automated.
   - prod keeps `synchronize: false`; migration glob is `*.{js,ts}` (loads under ts-node and compiled runtime).
-- Seeds: factory (random) data is guarded by `NODE_ENV !== "prod"`; prod seeds only essential data.
+- Seeds: **`seed:run` always targets local** — the script pins `cross-env NODE_ENV=local`, so
+  prefixing `NODE_ENV` does nothing (it looks like it worked, which is the dangerous part).
+  - **No deploy-environment seed path, deliberately.** It is not a technical limitation: drop the
+    `cross-env` and let the caller set `NODE_ENV`, which is exactly how `migrate.sh` works. It is
+    left closed because `migrate.sh` also prints the target, makes you type the env name, and
+    refuses without a TTY — unpinning the seed without those guards means one line
+    (`NODE_ENV=prod pnpm run seed`) writes to production with no confirmation. Add a `seed.sh`
+    with the same guards if a real need shows up; before that, essential reference data usually
+    belongs in a migration anyway, where ordering, revert and the boot guard already cover it.
+  - Factory (random) data is guarded by `NODE_ENV !== "prod"` in the seeder itself, so that branch
+    only matters once such a path exists.
 - Environments: `local | dev | prod | test`, files in `envs/` selected by `NODE_ENV` (`envs/env.ts`).
   `.env.*` are git-ignored; `.env.*.example` are committed templates.
 
