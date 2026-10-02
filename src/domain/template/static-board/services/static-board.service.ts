@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
 import { StaticBoardRepository } from "../repositories/static-board.repository";
 import { GenerateStaticBoardPayload } from "../dtos/request/generate-static-board.dto";
@@ -6,12 +6,19 @@ import { GetStaticBoardQuery } from "../dtos/request/get-static-board.dto";
 import { Pagination } from "src/global/decorators/pagination-query.decorator";
 import { StaticBoard } from "../entities/static-board.entity";
 import { ModifyStaticBoardPayload } from "../dtos/request/modify-static-board.dto";
+import { constants } from "../static-board.constants";
 
 /**
  * 애플리케이션 서비스 — 흐름 조율.
  * - 입력: request payload/query. 출력: 엔티티(도메인). HTTP 응답 DTO 는 만들지 않는다.
  * - 엔티티→응답 변환은 컨트롤러 경계에서 StaticBoardMapper 로 처리.
  * - 모든 접근이 서비스 레이어를 거치고, 원자성이 필요한 호출자는 manager를 넘겨준다" — 이 두 가지가 지켜지면 트랜잭션 처리 문제 없다.
+ *
+ * 에러 규약:
+ * - 존재 검증(404)은 findStaticBoardOrThrow 처럼 서비스가 한다. 레포는 없으면 null 을 돌려줄 뿐이다.
+ * - 업무 규칙에 해당하는 DB 에러(유니크·FK 위반)는 catch 한 자리에서
+ *   global/helpers/db-error.helper 로 판별해 도메인 예외(ConflictException 등)로 바꾼다.
+ * - 그 외 에러는 잡지 않는다. try/catch 는 트랜잭션 롤백과 위 변환이 필요할 때만 쓴다.
  *
  * 트랜잭션 규약(쓰기 메서드):
  * - 외부 tx(transactionManager)를 받으면 그대로 합류해 실행하고 끝낸다. commit/rollback/release 는 소유자(호출자) 몫.
@@ -58,7 +65,7 @@ export class StaticBoardService {
     query: GetStaticBoardQuery,
     transactionManager?: EntityManager
   ): Promise<StaticBoard> {
-    return this.staticBoardRepository.findStaticBoard(query, transactionManager);
+    return this.findStaticBoardOrThrow(query, transactionManager);
   }
 
   async getStaticBoardListAndCount(
@@ -123,5 +130,16 @@ export class StaticBoardService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  private async findStaticBoardOrThrow(
+    query: GetStaticBoardQuery,
+    transactionManager?: EntityManager
+  ): Promise<StaticBoard> {
+    const staticBoard = await this.staticBoardRepository.findStaticBoard(query, transactionManager);
+    if (!staticBoard) {
+      throw new NotFoundException(constants.errorMessages.FAIL_TO_FIND_STATIC_BOARD);
+    }
+    return staticBoard;
   }
 }
