@@ -1,7 +1,7 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { NestExpressApplication } from "@nestjs/platform-express";
-import * as bodyParser from "body-parser";
+import * as express from "express";
 import helmet from "helmet";
 import { ValidationPipe, VersioningType } from "@nestjs/common";
 import { join } from "node:path";
@@ -37,10 +37,11 @@ async function bootstrap() {
   /**
    * Body-parser
    */
+  // ★ Express 5 부터 urlencoded · json 이 내장이다. body-parser 직접 의존은 걷어냈다.
   app.use(
-    bodyParser.urlencoded({
-      limit: "50mb", //maximum request body size, default = 100kb
-      extended: true, // for any value types. not only string or Array
+    express.urlencoded({
+      limit: "50mb", // 요청 본문 상한. 기본값은 100kb
+      extended: true, // 문자열·배열 외의 값 타입도 받는다
     })
   );
 

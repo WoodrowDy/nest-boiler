@@ -14,7 +14,12 @@ export const requestLoggerHelper = function (
   loggingMessage: string;
   loggingContext: string;
 } {
-  const { method, url, headers, body } = req;
+  /**
+   * ★ body 에 기본값을 둔다.
+   *   Express 5 부터 본문이 없는 요청(GET 등)의 req.body 는 undefined 다 — 4 는 {} 였다.
+   *   그대로 두면 아래 body.password 에서 터져 모든 GET 이 500 이 된다.
+   */
+  const { method, url, headers, body = {} } = req;
   let decodedUrl = url;
   try {
     decodedUrl = decodeURI(url);
@@ -53,7 +58,12 @@ export const responseLoggerHelper = function (
   loggingMessage: string;
   loggingContext: string;
 } {
-  const { method, url, headers, body } = req;
+  /**
+   * ★ body 에 기본값을 둔다.
+   *   Express 5 부터 본문이 없는 요청(GET 등)의 req.body 는 undefined 다 — 4 는 {} 였다.
+   *   그대로 두면 아래 body.password 에서 터져 모든 GET 이 500 이 된다.
+   */
+  const { method, url, headers, body = {} } = req;
   let decodedUrl = url;
   try {
     decodedUrl = decodeURI(url);

@@ -23,9 +23,27 @@ interface DefaultValidationConfig extends ValidationOptions {
   required: boolean;
 }
 
-interface ApiPropertyValidatorOption extends ApiPropertyOptions {
+/**
+ * ★ interface extends 가 아니라 교차 타입이다.
+ *   @nestjs/swagger 11 에서 ApiPropertyOptions 가 유니온이 되어, 인터페이스로는
+ *   상속할 수 없다("statically known members" 가 아니다). 교차 타입은 유니온을 받는다.
+ *
+ * ★ type 을 이 데코레이터가 실제로 다루는 넷으로 좁힌다.
+ *   ApiPropertyOptions 의 type 을 그대로 받으면 "object" 분기가 섞여 들어오고,
+ *   그 분기는 additionalProperties 를 필수로 요구해 ApiProperty 에 넘길 수 없다.
+ *   아래 switch 가 string · number · boolean · Date 만 처리하므로 타입도 그렇게 적는다 —
+ *   객체 스키마가 필요하면 @ApiProperty 를 직접 쓰는 편이 맞다.
+ */
+type ApiPropertyValidatorOption = Omit<ApiPropertyOptions, "type" | "required"> & {
+  type: "string" | "number" | "boolean" | typeof Date;
+  /**
+   * ★ swagger 11 에서 required 가 boolean | string[] 로 넓어졌다(객체 스키마에서
+   *   필수 속성 이름 목록을 받기 위해서다). 이 데코레이터는 단일 속성에 붙으므로
+   *   boolean 만 의미가 있다 — IsRequired 도 참/거짓으로만 쓴다.
+   */
+  required: boolean;
   validator?: DefaultValidationConfig;
-}
+};
 
 export const ApiPropertyValidator = (options: ApiPropertyValidatorOption) => {
   const {
@@ -56,7 +74,12 @@ export const ApiPropertyValidator = (options: ApiPropertyValidatorOption) => {
     decorators.push(IsCustomArray(options));
   }
 
-  const apiProperty = ApiProperty({
+  /**
+   * ★ ApiPropertyOptions 로 한 번 받아 넘긴다.
+   *   swagger 11 에서 이 타입이 유니온이 되어, 객체 리터럴을 그대로 넘기면
+   *   type 이 넓을 때 "object" 분기로 추론돼 additionalProperties 를 요구한다.
+   */
+  const apiPropertyOptions: ApiPropertyOptions = {
     required,
     description,
     type,
@@ -69,7 +92,8 @@ export const ApiPropertyValidator = (options: ApiPropertyValidatorOption) => {
     minLength,
     minItems,
     maxItems,
-  });
+  };
+  const apiProperty = ApiProperty(apiPropertyOptions);
 
   decorators.push(apiProperty, IsRequired(options));
 
@@ -86,7 +110,11 @@ export const ApiPropertyValidator = (options: ApiPropertyValidatorOption) => {
       decorators.push(IsCustomBoolean(options));
       break;
     }
-    case "date": {
+    /**
+     * ★ "date" 는 OpenAPI 의 type 이 아니다 — swagger 10 이 느슨해서 통과했을 뿐이다.
+     *   날짜는 type: Date (생성자) 로 주고, 포맷은 format: "date-time" 으로 표현한다.
+     */
+    case Date: {
       decorators.push(IsCustomDate(options));
       break;
     }
