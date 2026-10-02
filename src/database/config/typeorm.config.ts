@@ -21,7 +21,7 @@ export const dataSourceOptions: DataSourceOptions = {
   migrationsTableName: "migrations",
 };
 
-const seederOptions: SeederOptions = {
+export const seederOptions: SeederOptions = {
   seeds: ["src/database/seeds/*.seed.{js,ts}", "src/domain/*/seeds/*.seed.{js,ts}"],
   factories: [
     "src/domain/*/seeds/*.factory.{js,ts}",

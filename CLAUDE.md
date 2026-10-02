@@ -160,7 +160,9 @@ Documented in `README.md` and **mechanically enforced by ESLint** (`no-restricte
   - → ESLint blocks `**/repositories/*`, `**/services/*`, `typeorm` and `async` in `**/mappers/*.ts`;
     and `**/repositories/*` / `typeorm` in `**/controllers/*.ts`.
 - **Repository handles queries only.** Existence checks (404) and transaction boundaries live in the
-  service. Return type is always `Entity` / `Entity[]`.
+  service. Return type is always `Entity` / `Entity[]`; a single lookup returns `null` when nothing
+  matches. Repositories never throw and never wrap calls in `try/catch` (see Error Handling).
+  - → ESLint also blocks `@nestjs/common` in `**/mappers/*.ts` (a mapper is a plain object, not a provider).
 
 Prettier config is a single source: `.prettierrc` (ESLint reads it, no inline options).
 
@@ -179,6 +181,35 @@ const manager = transactionManager ?? this.manager;   // repo's own manager if n
 - If an external tx (`transactionManager`) is passed, join it as-is and just run (the owner/caller does commit/rollback/release). Otherwise:
 - Single-row op → call the repo without opening a transaction (single statement is atomic).
 - Multi-step / needs a lock → service opens a new transaction with `createQueryRunner()` (connect → startTransaction → commit/rollback → release) and passes the manager to each repo call so they share one transaction.
+
+## Error Handling
+
+Classify errors by **meaning**, not by where they come from. DB errors fall on both sides.
+
+- **Expected (business rule)** — not found, wrong state, duplicate (unique violation), delete while
+  referenced (FK violation). The service throws a Nest exception (`NotFoundException`,
+  `ConflictException`, …) with a message from the domain's `*.constants.ts`.
+- **Unexpected (failure)** — connection lost, timeout, query bug. Not caught; it propagates.
+
+Rules:
+
+- Existence checks live in the service as `private findXxxOrThrow(...)`. The repository returns `null`.
+- No `try/catch` in repositories. Wrapping hides the cause and stops the service from telling a
+  duplicate from an outage.
+- Translate DB constraint errors **at the catch site** using `src/global/helpers/db-error.helper.ts`
+  (`isUniqueViolation` = PostgreSQL `23505`, `isForeignKeyViolation` = `23503`). Each catch site knows
+  which constraint it can hit, so there is no lookup table.
+- `try/catch` in services only for transaction rollback and the translation above:
+
+```ts
+} catch (error) {
+  if (isUniqueViolation(error)) throw new ConflictException(constants.errorMessages.DUPLICATE_X);
+  throw error;
+}
+```
+
+A global exception filter (unified error envelope with traceId, generic 500 message) is still a
+backlog item; until then unexpected errors use Nest's default 500 response.
 
 ## TypeORM hooks vs query methods
 
@@ -209,8 +240,8 @@ const manager = transactionManager ?? this.manager;   // repo's own manager if n
 
 ## Conventions Recap
 
-- Errors thrown as Nest `HttpException`s (`NotFoundException`/`BadRequestException` with messages from
-  the domain's `*.constants.ts`).
+- Errors thrown as Nest `HttpException`s (`NotFoundException`/`ConflictException`/… with messages from
+  the domain's `*.constants.ts`) — from services only. See Error Handling.
 - Migrations: entity change → `migration:generate` (auto), data/manual → `migration:create`.
   - **Never edit an applied migration** — add a new one. In VS Code, `src/database/migrations/**` is
     marked **read-only** (`.vscode/settings.json` → `files.readonlyInclude`), so trying to edit a

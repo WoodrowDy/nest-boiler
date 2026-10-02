@@ -79,7 +79,7 @@ nest-boiler/
 - **Mapper는 값을 만들지 않습니다 — 고르고 옮기기만 합니다.** 계산·집계·포맷·정책 판단이 들어오려 하면 그 값은 도메인 것입니다. 판별: **HTTP를 지워도 그 코드가 필요한가.** 필요하면 도메인입니다.
   - **왜 명시적 복사인가**: TypeScript 타입은 런타임에 없습니다. 반환 타입을 적어도 아무것도 걸러지지 않고, 이 레포는 `ClassSerializerInterceptor`도 쓰지 않습니다. **적지 않은 것은 나가지 않는다**(닫힘)가 `@Exclude`(열림)보다 안전합니다 — 빠뜨리면 안 나갈 뿐이고, `@Exclude`는 빠뜨리면 새어 나갑니다.
   - **Mapper는 조회하지 않습니다.** 필요한 값은 서비스가 미리 모아 인자로 넘깁니다(줄이 여럿이면 `Map`으로). 줄마다 조회하면 목록 하나에 N+1이 생깁니다.
-- **Repository는 엔티티만** 다룹니다(DTO를 모름). 반환 타입은 항상 `Entity`/`Entity[]`.
+- **Repository는 엔티티만** 다룹니다(DTO를 모름). 반환 타입은 항상 `Entity`/`Entity[]`이고, 단건 조회는 없으면 `null`을 그대로 돌려줍니다. 예외를 만들지 않습니다(아래 [에러 처리](#에러-처리)).
 - **공통 audit 응답 필드**(id/createdAt/updatedAt)는 `AuditResponse`(`src/global/dtos/audit.response.ts`) 한 곳에서 소유합니다.
   - **`deletedAt`은 담지 않습니다.** soft delete는 내부 구현이고 삭제된 행은 조회에서 걸러지므로 클라이언트가 받는 값은 언제나 `null`입니다. `CoreHardEntity` 도메인에는 컬럼 자체가 없어서, 여기 두면 절반의 도메인에 대해 Swagger가 거짓말을 합니다. 정말 필요한 도메인이 생기면 그 응답 DTO에 한 줄 선언합니다.
 
@@ -142,6 +142,33 @@ domain/<name>/
   - 외부 tx(`transactionManager`)를 받으면 그대로 합류해 실행(commit/rollback/release는 소유자 몫). 없으면 — 단건 op → 트랜잭션 없이 호출(단일 statement는 원자적), 다단계/락 → 서비스가 새 트랜잭션(`createQueryRunner()` → connect → startTransaction → commit/rollback → release)을 열어 각 레포에 매니저를 전달해 한 트랜잭션 공유.
 - **엔티티 훅 vs 쿼리 메서드**: `@BeforeInsert`/`@BeforeUpdate`는 **엔티티 기반 op(`save`/`softRemove`)에서만** 실행됩니다. 쿼리빌더 op(`update`/`insert`/`delete`/`softDelete`)는 훅을 건너뜁니다. `create()`는 인스턴스만 만들 뿐 훅을 태우지 않습니다.
 - **입력 정규화는 엔티티 훅이 아니라 DTO `@Transform`으로** 처리합니다 — 경로 독립적(save/update/seed 무관)이고 엔티티를 순수하게 유지. 예: 전화번호는 `normalizePhone`(`src/global/helpers/phone.helper.ts`)을 DTO `@Transform`과 시드가 공유합니다.
+
+### 에러 처리
+
+DB 에러를 포함해 모든 에러는 **"어디서 났는가"가 아니라 "무슨 뜻인가"로** 나눕니다.
+
+| 구분 | 예 | 처리 |
+| --- | --- | --- |
+| 예상한 에러 (업무 규칙) | 없음, 상태 불일치, 중복(유니크 위반), 사용 중 삭제(FK 위반) | 서비스가 Nest 예외(`NotFoundException`·`ConflictException` 등)로 던짐. 메시지는 도메인 `*.constants.ts` |
+| 예상하지 못한 에러 (장애) | 연결 끊김, 타임아웃, 쿼리 오류 | 잡지 않고 그대로 올림 |
+
+- **존재 검증은 서비스의 `findXxxOrThrow`** 가 합니다. 레포는 없으면 `null`을 돌려줄 뿐입니다.
+- **레포에서 `try/catch`로 감싸지 않습니다.** 감싸면 원인이 사라지고, 서비스가 중복·사용 중 같은 경우를 구분할 수 없습니다.
+- **DB 제약 위반은 catch 한 자리에서 변환**합니다. 판별은 `src/global/helpers/db-error.helper.ts`(`isUniqueViolation` = PostgreSQL `23505`, `isForeignKeyViolation` = `23503`)로 합니다. 그 자리에서 어떤 제약에 걸릴 수 있는지 알기 때문에 변환표는 두지 않습니다.
+- **`try/catch`는 두 경우에만** 씁니다. 트랜잭션 롤백, 그리고 위 DB 제약 변환입니다. 그 외에는 잡지 않습니다.
+
+```ts
+async createCategory(payload: CreateCategoryPayload): Promise<Category> {
+  try {
+    return await this.categoryRepository.createCategory(payload);
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new ConflictException(constants.errorMessages.DUPLICATE_CATEGORY);
+    }
+    throw error;
+  }
+}
+```
 
 ### 응답 & 관측성
 
