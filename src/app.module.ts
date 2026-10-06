@@ -23,22 +23,34 @@ import { StaticBoardModule } from "./domain/template/static-board/static-board.m
     ConfigModule.forRoot({
       envFilePath,
       isGlobal: true,
+      /**
+       * 없으면 앱이 제 기능을 못 하는 값만 적는다. 빠뜨린 채 뜨면 연결 재시도 끝에
+       * 실패하는데, 그 메시지로는 설정 누락인지 DB 가 죽었는지 구분할 수 없다.
+       *
+       * 여기 없는 것: SWAGGER_* 는 local 에서 불필요해 main.ts 가 환경을 보고 검사한다.
+       * SALT·ITERATIONS·KEYLEN·DIGEST 는 읽는 함수(crypto.helper)를 부르는 곳이 아직 없다.
+       */
       validationSchema: Joi.object({
         NODE_ENV: Joi.string()
           .valid(...commonConstants.props.NODE_ENV_ARRAY)
           .required(),
-        TZ: Joi.string().valid("Asia/Seoul").required(),
-        /**
-         * TODO: JWT, AWS_URL, AWS_SECRET
-         *         DB_SSL: Joi.string().required(),
-         *         DB_LOGGING: Joi.string().required(),
-         *         JWT_SECRET: Joi.string().required(),
-         *         AWS_CDN_URL: Joi.string().required(),
-         *         AWS_S3_BUCKET_NAME: Joi.string().required(),
-         *         AWS_S3_ACCESS_KEY_ID: Joi.string().required(),
-         *         AWS_S3_SECRET_ACCESS_KEY: Joi.string().required(),
-         *         AWS_S3_REGION: Joi.string().required(),
-         */
+        TZ: Joi.string().required(),
+
+        DB_HOST: Joi.string().required(),
+        DB_PORT: Joi.number().port().required(),
+        DB_NAME: Joi.string().required(),
+        DB_USERNAME: Joi.string().required(),
+        // 빈 값은 드라이버가 받지 못한다 — 접속 단계의 SASL 에러보다 여기서 끊는 편이 낫다.
+        DB_PASSWORD: Joi.string().required(),
+
+        DB_SCHEMA: Joi.string(),
+        DB_LOGGING: Joi.boolean(),
+        DB_MAX_QUERY_EXECUTION: Joi.number(),
+        USE_LOCAL_HTTPS_OPTIONS: Joi.boolean(),
+
+        JWT_SECRET: Joi.string().required(),
+
+        EXPECTED_DB_NAME: Joi.string().allow(""), // migrate.sh 용. 비우면 검사하지 않는다
       }),
     }),
     TypeOrmModule.forRoot({

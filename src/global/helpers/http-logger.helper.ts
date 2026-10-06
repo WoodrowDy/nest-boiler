@@ -6,6 +6,37 @@ import { get } from "lodash";
 import { lookup } from "geoip-country";
 import { ConnectionType } from "../enums/common.enums";
 import { CommonParsedUserAgentDto } from "../dtos/common-parsed-user-agent.dto";
+import { parseAuthHeader } from "./auth-header.helper";
+
+// 로그에 남기지 않는 헤더. 허용 목록이 아니라 차단 목록이다 — 허용 목록이면
+// 디버깅에 필요한 헤더가 조용히 사라진다.
+const SENSITIVE_HEADERS = new Set([
+  "authorization",
+  // "proxy-authorization",
+  // "cookie",
+  // "set-cookie",
+  // "x-api-key",
+  // "x-auth-token",
+]);
+
+// 스킴(`Bearer`)은 비밀이 아니라 남긴다. 스킴이 없으면 앞부분이 곧 비밀이라 통째로 가린다.
+const maskHeaderValue = function (key: string, value: unknown): unknown {
+  if (key !== "authorization" && key !== "proxy-authorization") return "***";
+
+  const scheme = parseAuthHeader(value)?.scheme;
+
+  return scheme ? `${scheme} ***` : "***";
+};
+
+const maskSensitiveHeaders = function (headers: Request["headers"]): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(headers ?? {}).map(([key, value]) => {
+      const name = key.toLowerCase();
+
+      return [key, SENSITIVE_HEADERS.has(name) ? maskHeaderValue(name, value) : value];
+    })
+  );
+};
 
 export const requestLoggerHelper = function (
   req: Request,
@@ -36,8 +67,11 @@ export const requestLoggerHelper = function (
     },
     null
   );
-  // TODO headers의 authorization을 로그 시 '***' 처리할 지 고민 중
-  const stringifiedReqHeaders = JSON.stringify({ reqHeaders: headers }, null, 0);
+  const stringifiedReqHeaders = JSON.stringify(
+    { reqHeaders: maskSensitiveHeaders(headers) },
+    null,
+    0
+  );
   const parsedUserAgent = userAgentParser(req);
   const stringifiedParsedUserAgent = JSON.stringify({ parsedUserAgent }, null, 0);
   req["parsedUserAgent"] = parsedUserAgent;
@@ -82,7 +116,11 @@ export const responseLoggerHelper = function (
     0
   );
 
-  const stringifiedReqHeaders = JSON.stringify({ reqHeaders: headers }, null, 0);
+  const stringifiedReqHeaders = JSON.stringify(
+    { reqHeaders: maskSensitiveHeaders(headers) },
+    null,
+    0
+  );
   const stringifiedResData = JSON.stringify({ resData }, null, 0);
   const stringifiedParsedUserAgent = JSON.stringify(
     { parsedUserAgent: userAgentParser(req) },

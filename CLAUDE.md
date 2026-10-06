@@ -208,8 +208,16 @@ Rules:
 }
 ```
 
-A global exception filter (unified error envelope with traceId, generic 500 message) is still a
-backlog item; until then unexpected errors use Nest's default 500 response.
+Whatever reaches the HTTP boundary is handled by the **global exception filter**
+(`global/filters/http-exception.filter.ts`, mounted in `main.ts`). It keeps Nest's shape and adds
+`meta`: `{ message, error, statusCode, meta: { traceId, timestamp } }`. Two things it does that the
+catch sites above rely on:
+
+- **Constraint errors that no catch site translated** still become `409` (`23505`, `23503`), so a
+  missed translation degrades to a sane status instead of a 500. Translating at the catch site is
+  still preferred — only there does a domain message exist.
+- **Unknown errors never leak their text.** The body is a generic message; stack and driver text
+  (which name tables and columns) stay in the log. `meta.traceId` is what ties the two together.
 
 ## TypeORM hooks vs query methods
 
@@ -280,4 +288,4 @@ backlog item; until then unexpected errors use Nest's default 500 response.
 
 Open items and "adopt from cmes-server when triggered" candidates are tracked in
 `docs/TODO.md` and `docs/cmes-adoption-candidates.md` (both git-ignored, local notes).
-Top P1: global exception filter (unify error envelope with traceId), real auth flow, stricter env validation.
+Top P1: real auth flow (`JwtModule`/`JwtMiddleware` may be stubs), stricter env validation.

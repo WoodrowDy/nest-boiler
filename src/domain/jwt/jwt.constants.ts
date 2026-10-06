@@ -1,6 +1,7 @@
 export const constants = {
   props: {
     AUTHORIZATION: "authorization",
+    BEARER_SCHEME: "Bearer",
   },
   errorMessages: {
     JWT_INVALID_TOKEN: {
