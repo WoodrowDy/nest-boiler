@@ -3,7 +3,10 @@ import { StaticBoardService } from "../services/static-board.service";
 import { ApiDoc } from "src/global/decorators/api-doc.decorator";
 import { GenerateStaticBoardPayload } from "../dtos/request/generate-static-board.dto";
 import { GetStaticBoardQuery } from "../dtos/request/get-static-board.dto";
-import { StaticBoardResponse } from "../dtos/response/static-board.dto";
+import {
+  StaticBoardDetailResponse,
+  StaticBoardListItemResponse,
+} from "../dtos/response/static-board.dto";
 import { StaticBoardMapper } from "../mappers/static-board.mapper";
 import { ObjectResponse } from "src/global/dtos/object-response.dto";
 import { ListResponse } from "src/global/dtos/list-response.dto";
@@ -22,46 +25,51 @@ export class StaticBoardController {
   @ApiDoc({
     summary: "테스트 보드 생성",
     description: "테스트 보드 생성",
-    responseModel: StaticBoardResponse,
+    responseModel: StaticBoardDetailResponse,
   })
   @Post()
   async postStaticBoard(
     @Body() payload: GenerateStaticBoardPayload
-  ): Promise<ObjectResponse<StaticBoardResponse>> {
+  ): Promise<ObjectResponse<StaticBoardDetailResponse>> {
     const staticBoard = await this.staticBoardService.generateStaticBoard(payload);
 
-    return new ObjectResponse(StaticBoardMapper.toResponse(staticBoard));
+    return new ObjectResponse(StaticBoardMapper.toDetail(staticBoard));
   }
 
   @ApiDoc({
     summary: "테스트 보드 리스트 조회",
     description: "테스트 보드 리스트 조회",
-    responseModel: StaticBoardResponse,
+    responseModel: StaticBoardListItemResponse,
     isArrayResponse: true,
   })
   @Get()
   async getStaticBoards(
     @Query() query: GetStaticBoardQuery,
     @PaginatedQuery() pagination: Pagination
-  ): Promise<ListResponse<StaticBoardResponse[]>> {
+  ): Promise<ListResponse<StaticBoardListItemResponse[]>> {
     const { list, count } = await this.staticBoardService.readStaticBoardListAndCount(
       query,
       pagination
     );
 
-    return new ListResponse(StaticBoardMapper.toList(list), count);
+    return new ListResponse(
+      list.map((entity) => StaticBoardMapper.toListItem(entity)),
+      count
+    );
   }
 
   @ApiDoc({
     summary: "테스트 보드 단일 조회",
     description: "테스트 보드 단일 조회",
-    responseModel: StaticBoardResponse,
+    responseModel: StaticBoardDetailResponse,
   })
   @Get("/:id")
-  async getStaticBoard(@Param("id") id: number): Promise<ObjectResponse<StaticBoardResponse>> {
+  async getStaticBoard(
+    @Param("id") id: number
+  ): Promise<ObjectResponse<StaticBoardDetailResponse>> {
     const staticBoard = await this.staticBoardService.readStaticBoard({ id });
 
-    return new ObjectResponse(StaticBoardMapper.toResponse(staticBoard));
+    return new ObjectResponse(StaticBoardMapper.toDetail(staticBoard));
   }
 
   @ApiDoc({

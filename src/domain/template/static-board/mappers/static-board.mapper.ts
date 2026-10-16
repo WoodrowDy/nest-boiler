@@ -1,5 +1,8 @@
 import { StaticBoard } from "../entities/static-board.entity";
-import { StaticBoardResponse } from "../dtos/response/static-board.dto";
+import {
+  StaticBoardDetailResponse,
+  StaticBoardListItemResponse,
+} from "../dtos/response/static-board.dto";
 
 /**
  * Entity → Response 변환 전담(무상태).
@@ -29,9 +32,19 @@ import { StaticBoardResponse } from "../dtos/response/static-board.dto";
  *   순서를 건너뛰고 from(entity) 로 가면 dtos/response 가 entities 를 import 하게 된다 —
  *   전송 타입이 영속성 타입에 의존하는 역전이고, 이 레포가 다른 곳에서 막는 방향이다.
  */
+/**
+ * ★ 입력 타입을 쓰는 필드만으로 좁힌다.
+ *   목록 조회가 body 를 select 하지 않아도 이 매퍼를 통과한다는 뜻이고,
+ *   시그니처가 "이 응답은 본문을 모른다" 를 말해준다.
+ */
+type StaticBoardListItemSource = Pick<
+  StaticBoard,
+  "id" | "createdAt" | "updatedAt" | "category" | "writer" | "isActivated"
+>;
+
 export const StaticBoardMapper = {
-  toResponse(entity: StaticBoard): StaticBoardResponse {
-    const dto = new StaticBoardResponse();
+  toDetail(entity: StaticBoard): StaticBoardDetailResponse {
+    const dto = new StaticBoardDetailResponse();
     dto.id = entity.id;
     dto.createdAt = entity.createdAt;
     dto.updatedAt = entity.updatedAt;
@@ -41,10 +54,19 @@ export const StaticBoardMapper = {
     dto.phone = entity.phone;
     dto.body = entity.body;
     dto.isActivated = entity.isActivated;
+
     return dto;
   },
 
-  toList(entities: StaticBoard[]): StaticBoardResponse[] {
-    return entities.map((entity) => StaticBoardMapper.toResponse(entity));
+  toListItem(entity: StaticBoardListItemSource): StaticBoardListItemResponse {
+    const dto = new StaticBoardListItemResponse();
+    dto.id = entity.id;
+    dto.createdAt = entity.createdAt;
+    dto.updatedAt = entity.updatedAt;
+    dto.category = entity.category;
+    dto.writer = entity.writer;
+    dto.isActivated = entity.isActivated;
+
+    return dto;
   },
 };

@@ -79,6 +79,8 @@ nest-boiler/
 - **Mapper는 값을 만들지 않습니다 — 고르고 옮기기만 합니다.** 계산·집계·포맷·정책 판단이 들어오려 하면 그 값은 도메인 것입니다. 판별: **HTTP를 지워도 그 코드가 필요한가.** 필요하면 도메인입니다.
   - **왜 명시적 복사인가**: TypeScript 타입은 런타임에 없습니다. 반환 타입을 적어도 아무것도 걸러지지 않고, 이 레포는 `ClassSerializerInterceptor`도 쓰지 않습니다. **적지 않은 것은 나가지 않는다**(닫힘)가 `@Exclude`(열림)보다 안전합니다 — 빠뜨리면 안 나갈 뿐이고, `@Exclude`는 빠뜨리면 새어 나갑니다.
   - **Mapper는 조회하지 않습니다.** 필요한 값은 서비스가 미리 모아 인자로 넘깁니다(줄이 여럿이면 `Map`으로). 줄마다 조회하면 목록 하나에 N+1이 생깁니다.
+- **응답 모양은 도메인당 하나가 아니라 엔드포인트당 하나입니다.** 하나로 두면 결국 **가장 큰 모양으로 수렴**합니다 — 목록이 상세에 필요한 것까지 따라가서 행마다 본문 2000자와 전화번호가 실려 나갑니다. 응답 DTO를 `XListItemResponse`·`XDetailResponse`로 쪼개고, 매퍼도 모양마다 한 메서드씩 둡니다(`toListItem`·`toDetail`).
+- **필드는 한 줄씩 대입합니다.** `Object.assign(new X(), {...})`은 오타·초과 필드·필수 누락을 **모두 통과시킵니다**(tsc로 확인). 특히 초과 필드가 그대로 클라이언트까지 나가서, 이 레이어가 지키려는 "적지 않은 것은 나가지 않는다"가 깨집니다. ESLint가 매퍼에서 막습니다.
 - **Repository는 엔티티만** 다룹니다(DTO를 모름). 반환 타입은 항상 `Entity`/`Entity[]`이고, 단건 조회는 없으면 `null`을 그대로 돌려줍니다. 예외를 만들지 않습니다(아래 [에러 처리](#에러-처리)).
 - **공통 audit 응답 필드**(id/createdAt/updatedAt)는 `AuditResponse`(`src/global/dtos/audit.response.ts`) 한 곳에서 소유합니다.
   - **`deletedAt`은 담지 않습니다.** soft delete는 내부 구현이고 삭제된 행은 조회에서 걸러지므로 클라이언트가 받는 값은 언제나 `null`입니다. `CoreHardEntity` 도메인에는 컬럼 자체가 없어서, 여기 두면 절반의 도메인에 대해 Swagger가 거짓말을 합니다. 정말 필요한 도메인이 생기면 그 응답 DTO에 한 줄 선언합니다.
@@ -133,7 +135,7 @@ domain/<name>/
 - **엔티티**(`**/entities/*.entity.ts`): `@nestjs/swagger`·`class-validator`·`class-transformer` import 금지 → 엔티티에 API/검증/변환 지식이 새는 것을 차단.
 - **서비스·레포**(`**/services/*.ts`, `**/repositories/*.ts`): `dtos/response/**` import 금지 → 응답 DTO는 컨트롤러 경계의 Mapper에서만 생성.
 - **서비스**(`**/services/*.ts`): 다른 도메인의 `src/domain/*/**/repositories/*` import 금지 → 도메인은 그 도메인의 서비스로만 들어옵니다. 레포 직행은 트랜잭션 경계와 존재 검증을 건너뜁니다. 자기 도메인은 `../repositories/*` 상대경로라 영향 없습니다.
-- **매퍼**(`**/mappers/*.ts`): `repositories/**`·`services/**`·`typeorm`·`@nestjs/common` import 금지, `async` 금지 → 매퍼는 조회하지 않는 무상태 변환이고, 프로바이더가 아니라 평범한 객체입니다.
+- **매퍼**(`**/mappers/*.ts`): `repositories/**`·`services/**`·`typeorm`·`@nestjs/common` import 금지, `async`·`Object.assign` 금지 → 매퍼는 조회하지 않는 무상태 변환이고, 프로바이더가 아니라 평범한 객체입니다. `Object.assign`은 오타·초과 필드·필수 누락을 다 통과시켜 닫힌 기본값을 깨뜨립니다.
 - **컨트롤러**(`**/controllers/*.ts`): `repositories/**`·`typeorm` import 금지 → 컨트롤러는 DB를 모르고 서비스를 통합니다.
 - 위반 시 `eslint`/pre-commit 에서 에러로 차단됩니다. (규칙 = 자동 강제, README는 근거만 기술)
 

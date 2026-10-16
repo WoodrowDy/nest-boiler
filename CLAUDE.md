@@ -157,8 +157,23 @@ Documented in `README.md` and **mechanically enforced by ESLint** (`no-restricte
   - Listing every outgoing field by hand is the point. TS types do not exist at runtime and there is
     no `ClassSerializerInterceptor` here, so **what you don't write doesn't ship** (closed) — safer
     than `@Exclude` (open), where forgetting one leaks instead of omitting.
-  - → ESLint blocks `**/repositories/*`, `**/services/*`, `typeorm` and `async` in `**/mappers/*.ts`;
-    and `**/repositories/*` / `typeorm` in `**/controllers/*.ts`.
+  - → ESLint blocks `**/repositories/*`, `**/services/*`, `typeorm`, `async` and `Object.assign` in
+    `**/mappers/*.ts`; and `**/repositories/*` / `typeorm` in `**/controllers/*.ts`.
+- **One response shape per endpoint, not per domain.** A single shape converges on the largest one:
+  the list ends up carrying whatever the detail needs, so every row ships a 2,000-character body and
+  a phone number nobody asked for. Split the response DTO (`XListItemResponse`, `XDetailResponse`)
+  and give the mapper one method per shape (`toListItem`, `toDetail`, `toSaveResponse`).
+  - **Narrow the input with `Pick`.** `toListItem(entity: Pick<X, "id" | "category" | …>)` states that
+    this response does not know about the body, and it keeps compiling once the list query stops
+    selecting that column.
+  - **No array helper.** A `toList` that only wraps `entities.map(toResponse)` adds nothing — the
+    controller maps. Wrap the callback in an arrow (`list.map((e) => Mapper.toListItem(e))`);
+    `unicorn/no-array-callback-reference` blocks passing the method directly, because `.map` also
+    hands the callback an index and the array.
+  - **Assign field by field; never `Object.assign`.** Verified with tsc: `Object.assign(new X(), {…})`
+    silently accepts a misspelled key, an extra key and a missing required one. The extra key is the
+    dangerous one — it ships straight to the client, breaking the closed default this layer exists
+    to keep.
 - **Repository handles queries only.** Existence checks (404) and transaction boundaries live in the
   service. Return type is always `Entity` / `Entity[]`; a single lookup returns `null` when nothing
   matches. Repositories never throw and never wrap calls in `try/catch` (see Error Handling).

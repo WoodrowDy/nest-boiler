@@ -165,12 +165,19 @@ export default [
           ],
         },
       ],
-      // 비동기가 필요하다는 것은 기다릴 일이 있다는 뜻이고, 그 일은 서비스 것이다.
       "no-restricted-syntax": [
         "error",
+        // 비동기가 필요하다는 것은 기다릴 일이 있다는 뜻이고, 그 일은 서비스 것이다.
         {
           selector: "FunctionExpression[async=true], ArrowFunctionExpression[async=true]",
           message: "매퍼는 동기 — 비동기가 필요하면 그 일은 서비스 것이다",
+        },
+        // Object.assign 은 오타·초과 필드·필수 누락을 모두 통과시킨다(tsc 로 확인).
+        // 특히 초과 필드가 그대로 응답에 실려 "적지 않은 것은 나가지 않는다" 가 깨진다.
+        {
+          selector: 'CallExpression[callee.object.name="Object"][callee.property.name="assign"]',
+          message:
+            "매퍼는 필드를 한 줄씩 대입한다 — Object.assign 은 오타·초과 필드·필수 누락을 다 통과시킨다",
         },
       ],
     },
