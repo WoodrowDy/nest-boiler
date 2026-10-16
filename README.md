@@ -85,15 +85,15 @@ nest-boiler/
 
 ### 계층별 역할
 
-| 계층 | 입력 | 출력 | 정의 위치 |
-| --- | --- | --- | --- |
-| Controller | Request DTO | Response DTO | `dtos/request`, `dtos/response` |
-| Service | Request payload/query | Entity / 도메인 모델 | `services/` |
-| Repository | 조회 파라미터 / Entity | Entity | `repositories/` |
-| Mapper | Entity | Response DTO | `mappers/` |
-| Entity | — | — | `entities/` (영속성 전용) |
-| 필드 계약(공유) | — | — | `dtos/shared/` |
-| Audit 응답 | — | — | `src/global/dtos/audit.response.ts` |
+| 계층            | 입력                   | 출력                 | 정의 위치                           |
+| --------------- | ---------------------- | -------------------- | ----------------------------------- |
+| Controller      | Request DTO            | Response DTO         | `dtos/request`, `dtos/response`     |
+| Service         | Request payload/query  | Entity / 도메인 모델 | `services/`                         |
+| Repository      | 조회 파라미터 / Entity | Entity               | `repositories/`                     |
+| Mapper          | Entity                 | Response DTO         | `mappers/`                          |
+| Entity          | —                      | —                    | `entities/` (영속성 전용)           |
+| 필드 계약(공유) | —                      | —                    | `dtos/shared/`                      |
+| Audit 응답      | —                      | —                    | `src/global/dtos/audit.response.ts` |
 
 ### 데이터 흐름
 
@@ -119,7 +119,7 @@ domain/<name>/
   mappers/           # Entity ↔ DTO 무상태 변환
 ```
 
-> **파일명 권장**: 입력 `*.payload.ts` / `*.query.ts`, 출력 `*.response.ts`, 공유 `*-fields.dto.ts`.
+> **파일명**: 모두 `*.dto.ts`로 두고 디렉토리로 구분합니다 — `dtos/request/`·`dtos/response/`·`dtos/shared/`. 공유 계약은 `*-fields.dto.ts`입니다.
 
 ### VO (선택)
 
@@ -132,6 +132,9 @@ domain/<name>/
 
 - **엔티티**(`**/entities/*.entity.ts`): `@nestjs/swagger`·`class-validator`·`class-transformer` import 금지 → 엔티티에 API/검증/변환 지식이 새는 것을 차단.
 - **서비스·레포**(`**/services/*.ts`, `**/repositories/*.ts`): `dtos/response/**` import 금지 → 응답 DTO는 컨트롤러 경계의 Mapper에서만 생성.
+- **서비스**(`**/services/*.ts`): 다른 도메인의 `src/domain/*/**/repositories/*` import 금지 → 도메인은 그 도메인의 서비스로만 들어옵니다. 레포 직행은 트랜잭션 경계와 존재 검증을 건너뜁니다. 자기 도메인은 `../repositories/*` 상대경로라 영향 없습니다.
+- **매퍼**(`**/mappers/*.ts`): `repositories/**`·`services/**`·`typeorm`·`@nestjs/common` import 금지, `async` 금지 → 매퍼는 조회하지 않는 무상태 변환이고, 프로바이더가 아니라 평범한 객체입니다.
+- **컨트롤러**(`**/controllers/*.ts`): `repositories/**`·`typeorm` import 금지 → 컨트롤러는 DB를 모르고 서비스를 통합니다.
 - 위반 시 `eslint`/pre-commit 에서 에러로 차단됩니다. (규칙 = 자동 강제, README는 근거만 기술)
 
 > Prettier 설정은 `.prettierrc` **단일 소스**로 통일(eslint 인라인 옵션 제거)하여 에디터↔lint 포맷 충돌을 방지합니다.
@@ -147,12 +150,13 @@ domain/<name>/
 
 DB 에러를 포함해 모든 에러는 **"어디서 났는가"가 아니라 "무슨 뜻인가"로** 나눕니다.
 
-| 구분 | 예 | 처리 |
-| --- | --- | --- |
-| 예상한 에러 (업무 규칙) | 없음, 상태 불일치, 중복(유니크 위반), 사용 중 삭제(FK 위반) | 서비스가 Nest 예외(`NotFoundException`·`ConflictException` 등)로 던짐. 메시지는 도메인 `*.constants.ts` |
-| 예상하지 못한 에러 (장애) | 연결 끊김, 타임아웃, 쿼리 오류 | 잡지 않고 그대로 올림 |
+| 구분                      | 예                                                          | 처리                                                                                                    |
+| ------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 예상한 에러 (업무 규칙)   | 없음, 상태 불일치, 중복(유니크 위반), 사용 중 삭제(FK 위반) | 서비스가 Nest 예외(`NotFoundException`·`ConflictException` 등)로 던짐. 메시지는 도메인 `*.constants.ts` |
+| 예상하지 못한 에러 (장애) | 연결 끊김, 타임아웃, 쿼리 오류                              | 잡지 않고 그대로 올림                                                                                   |
 
-- **존재 검증은 서비스의 `findXxxOrThrow`** 가 합니다. 레포는 없으면 `null`을 돌려줄 뿐입니다.
+- **던지는 층은 서비스, `null`을 돌려주는 층은 레포**입니다. 단건 조회 `readX`가 없으면 `NotFoundException`을 던지므로 `readXOrThrow` 같은 접미사는 쓰지 않습니다 — 위임만 하고 아무것도 더하지 않는 이름이 됩니다.
+- **미스가 정상인 조회는 `readXOrNull`** 입니다. 레포 결과를 그대로 통과시키고, `readX`가 그것을 쓰면서 가드만 더해 던지는 자리를 한 곳에 둡니다. 중복 검사·업서트·nullable 관계·없는 것을 건너뛰는 배치에서 씁니다.
 - **레포에서 `try/catch`로 감싸지 않습니다.** 감싸면 원인이 사라지고, 서비스가 중복·사용 중 같은 경우를 구분할 수 없습니다.
 - **DB 제약 위반은 catch 한 자리에서 변환**합니다. 판별은 `src/global/helpers/db-error.helper.ts`(`isUniqueViolation` = PostgreSQL `23505`, `isForeignKeyViolation` = `23503`)로 합니다. 그 자리에서 어떤 제약에 걸릴 수 있는지 알기 때문에 변환표는 두지 않습니다.
 - **`try/catch`는 두 경우에만** 씁니다. 트랜잭션 롤백, 그리고 위 DB 제약 변환입니다. 그 외에는 잡지 않습니다.
@@ -184,7 +188,7 @@ async createCategory(payload: CreateCategoryPayload): Promise<Category> {
 [How to Write an Effective Software Design Document](https://refactoringenglish.com/excerpts/write-an-effective-design-doc/)
 
 - **쓸지 말지**: 사람이 여럿 붙거나 3개월을 넘기는 일이면 씁니다. 아니면 안 써도 됩니다 —
-  원문도 *"때로는 설계 문서에 들일 적정 비용이 0"* 이라고 말합니다.
+  원문도 _"때로는 설계 문서에 들일 적정 비용이 0"_ 이라고 말합니다.
 - **무엇을 적을지**: **틀렸을 때 대가가 큰 결정**만 적습니다. 사소한 선택까지 적으면 길어지고,
   길어지면 아무도 안 읽어서 리뷰를 못 받습니다. 설계 문서의 목적은 리뷰를 받는 것입니다.
 - **그림을 아끼지 않습니다**: 읽는 사람 머릿속에는 당신이 보고 있는 그림이 없습니다.
@@ -287,13 +291,13 @@ pnpm run test:cov
 환경은 `local | dev | prod | test` 네 가지이며, `NODE_ENV` 값으로 `envs/` 아래 파일이
 선택됩니다(`envs/env.ts`).
 
-| 파일 | 용도 | git |
-|---|---|---|
-| `envs/.env.local` | 로컬 개발 | 제외 |
-| `envs/.env.test` | e2e | 커밋됨 |
-| `envs/.env.dev` · `.env.prod` | 배포 환경 — **서버에만 둡니다** | 제외 |
-| `envs/.env.docker` | 로컬 Postgres 컨테이너 자격증명 | 제외 |
-| `envs/.env.*.example` | 템플릿 | 커밋됨 |
+| 파일                          | 용도                            | git    |
+| ----------------------------- | ------------------------------- | ------ |
+| `envs/.env.local`             | 로컬 개발                       | 제외   |
+| `envs/.env.test`              | e2e                             | 커밋됨 |
+| `envs/.env.dev` · `.env.prod` | 배포 환경 — **서버에만 둡니다** | 제외   |
+| `envs/.env.docker`            | 로컬 Postgres 컨테이너 자격증명 | 제외   |
+| `envs/.env.*.example`         | 템플릿                          | 커밋됨 |
 
 `.env.*` 는 git 에서 제외하고 `.env.*.example` 만 커밋합니다. 새 환경을 쓸 때는
 example 을 복사해 값을 채웁니다.
@@ -345,24 +349,25 @@ pnpm migrate:revert:dev   # 마지막 한 건 철회 (revert-dev 를 입력)
 - 상수: UPPER_SNAKE_CASE
 - 디렉토리/파일: 소문자, 하이픈(-) 구분
 
-## 예외 처리
-
-- NestJS의 Exception Filter를 활용하여 일관된 예외 처리를 구현합니다.
-- 커스텀 예외 및 에러 코드는 `shared/` 디렉토리에서 관리합니다.
+**메서드 이름은 레이어마다 다른 동사를 씁니다** — 이름만 보고 어느 레이어인지 알게 하려는 것입니다
+(컨트롤러 `postX`·`getX`, 서비스 `generateX`·`readX`·`modifyX`·`removeX`, 레포 `createX`·`findX`·`updateX`·`softDeleteX`).
+레이어별 동사 표와 업무 동사 규칙은 `CLAUDE.md`의 **Naming (CRUD)** 절이 단일 소스입니다.
 
 ## Git Hooks (Husky)
 
 이 프로젝트는 코드 품질 관리를 위해 Husky를 사용합니다:
 
 ### Pre-commit Hook
+
 - **실행 시점**: 커밋 전 자동 실행
-- **실행 내용**: 
+- **실행 내용**:
   - ESLint로 코드 검사 및 자동 수정
   - Prettier로 코드 포맷팅
 - **대상 파일**: staged된 TypeScript/JavaScript 파일만
 
 ### Pre-push Hook
-- **실행 시점**: 푸시 전 자동 실행  
+
+- **실행 시점**: 푸시 전 자동 실행
 - **실행 내용**: E2E 테스트 (`pnpm run test:local`)
 - **목적**: 테스트를 통과한 코드만 원격 저장소에 푸시
 
