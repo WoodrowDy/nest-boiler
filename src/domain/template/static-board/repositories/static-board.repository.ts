@@ -67,7 +67,7 @@ export class StaticBoardRepository extends Repository<StaticBoard> {
     await manager.update(StaticBoard, id, instance);
   }
 
-  async deleteStaticBoard(id: number, transactionManager?: EntityManager): Promise<void> {
+  async softDeleteStaticBoard(id: number, transactionManager?: EntityManager): Promise<void> {
     const manager = transactionManager ?? this.manager;
 
     // @DeleteDateColumn(deletedAt) 기반 소프트 삭제. 존재 검증(404)은 서비스가 담당

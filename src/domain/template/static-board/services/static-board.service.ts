@@ -15,7 +15,7 @@ import { constants } from "../static-board.constants";
  * - 모든 접근이 서비스 레이어를 거치고, 원자성이 필요한 호출자는 manager를 넘겨준다" — 이 두 가지가 지켜지면 트랜잭션 처리 문제 없다.
  *
  * 에러 규약:
- * - 존재 검증(404)은 findStaticBoardOrThrow 처럼 서비스가 한다. 레포는 없으면 null 을 돌려줄 뿐이다.
+ * - 단건 조회는 없으면 404 를 던진다(readStaticBoard). 레포는 null 을 돌려줄 뿐이다 — 던지는 층이 서비스다.
  * - 업무 규칙에 해당하는 DB 에러(유니크·FK 위반)는 catch 한 자리에서
  *   global/helpers/db-error.helper 로 판별해 도메인 예외(ConflictException 등)로 바꾼다.
  * - 그 외 에러는 잡지 않는다. try/catch 는 트랜잭션 롤백과 위 변환이 필요할 때만 쓴다.
@@ -61,14 +61,27 @@ export class StaticBoardService {
     // }
   }
 
-  async getStaticBoard(
+  // 미스를 허용하는 조회. 도메인 밖에서 null 이 필요하면 여기를 쓴다 — 레포를 직접 부르지 않는다.
+  async readStaticBoardOrNull(
+    query: GetStaticBoardQuery,
+    transactionManager?: EntityManager
+  ): Promise<StaticBoard | null> {
+    return this.staticBoardRepository.findStaticBoard(query, transactionManager);
+  }
+
+  async readStaticBoard(
     query: GetStaticBoardQuery,
     transactionManager?: EntityManager
   ): Promise<StaticBoard> {
-    return this.findStaticBoardOrThrow(query, transactionManager);
+    const staticBoard = await this.readStaticBoardOrNull(query, transactionManager);
+    if (!staticBoard) {
+      throw new NotFoundException(constants.errorMessages.FAIL_TO_FIND_STATIC_BOARD);
+    }
+
+    return staticBoard;
   }
 
-  async getStaticBoardListAndCount(
+  async readStaticBoardListAndCount(
     query: GetStaticBoardQuery,
     pagination: Pagination,
     transactionManager?: EntityManager
@@ -87,7 +100,7 @@ export class StaticBoardService {
   ): Promise<void> {
     // 외부 tx 를 받았으면 존재검증 + 수정을 그 tx 안에서 실행 — commit/rollback/release 는 소유자 몫.
     if (transactionManager) {
-      await this.getStaticBoard({ id }, transactionManager);
+      await this.readStaticBoard({ id }, transactionManager);
       await this.staticBoardRepository.updateStaticBoard(id, payload, transactionManager);
       return;
     }
@@ -97,7 +110,7 @@ export class StaticBoardService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      await this.getStaticBoard({ id }, queryRunner.manager);
+      await this.readStaticBoard({ id }, queryRunner.manager);
       await this.staticBoardRepository.updateStaticBoard(id, payload, queryRunner.manager);
       await queryRunner.commitTransaction();
     } catch (error) {
@@ -111,8 +124,8 @@ export class StaticBoardService {
   async removeStaticBoard(id: number, transactionManager?: EntityManager): Promise<void> {
     // 외부 tx 를 받았으면 존재검증 + 삭제를 그 tx 안에서 실행 — commit/rollback/release 는 소유자 몫.
     if (transactionManager) {
-      await this.getStaticBoard({ id }, transactionManager);
-      await this.staticBoardRepository.deleteStaticBoard(id, transactionManager);
+      await this.readStaticBoard({ id }, transactionManager);
+      await this.staticBoardRepository.softDeleteStaticBoard(id, transactionManager);
       return;
     }
 
@@ -121,8 +134,8 @@ export class StaticBoardService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      await this.getStaticBoard({ id }, queryRunner.manager);
-      await this.staticBoardRepository.deleteStaticBoard(id, queryRunner.manager);
+      await this.readStaticBoard({ id }, queryRunner.manager);
+      await this.staticBoardRepository.softDeleteStaticBoard(id, queryRunner.manager);
       await queryRunner.commitTransaction();
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -130,16 +143,5 @@ export class StaticBoardService {
     } finally {
       await queryRunner.release();
     }
-  }
-
-  private async findStaticBoardOrThrow(
-    query: GetStaticBoardQuery,
-    transactionManager?: EntityManager
-  ): Promise<StaticBoard> {
-    const staticBoard = await this.staticBoardRepository.findStaticBoard(query, transactionManager);
-    if (!staticBoard) {
-      throw new NotFoundException(constants.errorMessages.FAIL_TO_FIND_STATIC_BOARD);
-    }
-    return staticBoard;
   }
 }

@@ -168,6 +168,63 @@ Prettier config is a single source: `.prettierrc` (ESLint reads it, no inline op
 
 ---
 
+## Naming (CRUD)
+
+Each layer owns its own verbs, so a method name tells you which layer you are in. Form is
+`verb + Entity`; a list method that also returns a count is `...ListAndCount` (what `ListResponse`
+needs).
+
+| Layer | create | read one | read list | update | delete |
+|---|---|---|---|---|---|
+| Controller | `postX` | `getX` | `getXs` | `patchX` | `deleteX` |
+| Service | `generateX` | `readX` | `readXListAndCount` | `modifyX` | `removeX` |
+| Repository | `createX` | `findX` | `findXListAndCount` | `updateX` | `softDeleteX` |
+
+`POST /static-boards` → `postStaticBoard` → `generateStaticBoard` → `createStaticBoard`.
+
+- **A service never uses an HTTP verb (`get`, `post`) or a SQL verb (`insert`, `find`, `update`).**
+  Seeing `find...` in a service means a repository method leaked upward. Service reads throw on a
+  miss, so there is no `OrThrow` suffix either (see Error Handling).
+- **`softDeleteX` names what it does** (`manager.softDelete`, `@DeleteDateColumn`). It also keeps the
+  repository from colliding with the controller's `deleteX`. A `CoreHardEntity` domain uses
+  `hardDeleteX`.
+- **Business actions get a business verb**, built on the CRUD set. The controller endpoint is the
+  HTTP verb plus the service method name — `POST /notices/:id/publish` → `postPublishNotice` →
+  `publishNotice`. In a service, `this.modifyX` means the base set, `this.xRepository.updateX` means
+  straight to the DB, so the call itself tells you how deep you are.
+  - **The base set knows nothing about state.** `modifyX(id, payload, manager?)` changes fields and
+    that is all. A transition rule belongs to the action that needs it, checked in that method's own
+    body:
+
+    ```ts
+    async publishNotice(id: number, transactionManager?: EntityManager): Promise<void> {
+      const notice = await this.readNotice({ id }, transactionManager);
+      if (notice.status !== NoticeStatus.DRAFT) {
+        throw new ConflictException(constants.errorMessages.NOT_DRAFT);
+      }
+
+      await this.modifyNotice(id, { status: PUBLISHED, publishedAt: now() }, transactionManager);
+    }
+    ```
+
+  - **Do not push the rule into parameters** — `modifyX(id, payload, statusValues = {}, allowedFrom
+    = [DRAFT])` looks like reuse and is not. Two of the four arguments are behaviour switches, so the
+    rule lives in the argument list instead of in a body you can read, and a plain
+    `modifyX(id, payload)` that only means to edit a title silently inherits "DRAFT only" from the
+    default. Every new action then adds a switch or overloads an existing one, and all the state
+    rules pile up in one method.
+
+**Never re-read after a write in the same request.** If the `INSERT`/`UPDATE` returned without an
+error it succeeded; respond with the saved result or with values you already hold.
+
+- Reads go to a replica under replication, so a read right after a write can land before the row has
+  replicated: a 404 for the row you just created, or pre-update values. It never reproduces on a
+  single local DB, so it only shows up in production.
+- `createX` can return the entity because `manager.save()` gives it back, defaults included.
+  `updateX` cannot — `manager.update()` returns an `UpdateResult`, and query-builder writes skip
+  `@BeforeUpdate`. So an update path must not promise fields the DB or a hook computes. Returning
+  `void` (what `patchStaticBoard` does) is the honest default.
+
 ## Transactions
 
 The transaction **boundary is the service**, not the repository. Repositories are transaction-aware
@@ -193,7 +250,18 @@ Classify errors by **meaning**, not by where they come from. DB errors fall on b
 
 Rules:
 
-- Existence checks live in the service as `private findXxxOrThrow(...)`. The repository returns `null`.
+- **A service read throws on a miss; the repository returns `null`.** Throwing is what the service
+  layer is for, so `readX` raises `NotFoundException` and there is no `readXOrThrow` twin — that
+  twin delegates without adding anything, which is one behaviour under two names.
+- **`readXOrNull` is the pair that earns its name.** It passes the repository result through, and
+  `readX` calls it and adds the guard, so the throw and its message stay in one place and the query
+  count does not change. Use it wherever a miss is a normal outcome: a duplicate check, an upsert, a
+  nullable relation, a batch that skips what it cannot find.
+- **A domain is entered through its service, never its repository.** ESLint blocks
+  `src/domain/*/**/repositories/*` inside `**/services/*.ts`, so another domain cannot reach past
+  the transaction boundary and the existence check. Own-domain imports use `../repositories/*` and
+  are unaffected. That restriction is why `readXOrNull` exists rather than letting callers reach for
+  `findX` themselves.
 - No `try/catch` in repositories. Wrapping hides the cause and stops the service from telling a
   duplicate from an outage.
 - Translate DB constraint errors **at the catch site** using `src/global/helpers/db-error.helper.ts`

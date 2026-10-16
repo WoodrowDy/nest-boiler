@@ -44,7 +44,7 @@ export class StaticBoardController {
     @Query() query: GetStaticBoardQuery,
     @PaginatedQuery() pagination: Pagination
   ): Promise<ListResponse<StaticBoardResponse[]>> {
-    const { list, count } = await this.staticBoardService.getStaticBoardListAndCount(
+    const { list, count } = await this.staticBoardService.readStaticBoardListAndCount(
       query,
       pagination
     );
@@ -59,7 +59,7 @@ export class StaticBoardController {
   })
   @Get("/:id")
   async getStaticBoard(@Param("id") id: number): Promise<ObjectResponse<StaticBoardResponse>> {
-    const staticBoard = await this.staticBoardService.getStaticBoard({ id });
+    const staticBoard = await this.staticBoardService.readStaticBoard({ id });
 
     return new ObjectResponse(StaticBoardMapper.toResponse(staticBoard));
   }

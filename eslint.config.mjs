@@ -130,6 +130,13 @@ export default [
               group: ["**/dtos/response/*", "**/dto/response/*"],
               message: "서비스/레포는 엔티티를 반환 — 응답 DTO 변환은 컨트롤러 경계(Mapper)에서",
             },
+            {
+              // 자기 도메인 레포는 "../repositories/*" 상대경로로 부르므로 걸리지 않는다.
+              // 남의 도메인은 "src/domain/..." 으로 쓰게 되고, 그것만 막는다.
+              group: ["src/domain/*/**/repositories/*", "src/domain/*/repositories/*"],
+              message:
+                "도메인 밖에서는 그 도메인의 서비스를 부른다 — 레포 직행은 트랜잭션 경계와 존재 검증을 건너뛴다",
+            },
           ],
         },
       ],
