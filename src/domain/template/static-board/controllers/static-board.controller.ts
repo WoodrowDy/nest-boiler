@@ -58,7 +58,7 @@ export class StaticBoardController {
     @Query() pagination: PaginationQuery
   ): Promise<ListResponse<StaticBoardListItemResponse[]>> {
     const { list, count } = await this.staticBoardService.readStaticBoardListAndCount(
-      { ...query, isJoinUser: true },
+      query,
       pagination
     );
 
