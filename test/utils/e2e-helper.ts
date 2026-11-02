@@ -1,4 +1,4 @@
-import { BadRequestException, INestApplication, ValidationPipe } from "@nestjs/common";
+import { BadRequestException, INestApplication } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { AppModule } from "src/app.module";
 import { DataSource } from "typeorm";
@@ -17,8 +17,6 @@ export async function launchAppAndGetTestAppAndDb() {
 
   await dataSource.dropDatabase();
   await dataSource.synchronize();
-
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   await app.init();
 

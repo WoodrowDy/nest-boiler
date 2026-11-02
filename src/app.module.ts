@@ -1,8 +1,15 @@
-import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
-import { APP_INTERCEPTOR } from "@nestjs/core";
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+  ValidationPipe,
+} from "@nestjs/common";
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from "@nestjs/core";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { ResponseLoggerInterceptor } from "./global/interceptors/response-logger.interceptor";
+import { HttpExceptionFilter } from "./global/filters/http-exception.filter";
 import { ConfigModule } from "@nestjs/config";
 import envFilePath from "../envs/env";
 import * as Joi from "joi";
@@ -78,6 +85,10 @@ import { StaticBoardModule } from "./domain/template/static-board/static-board.m
   controllers: [AppController],
   providers: [
     AppService,
+    // 전역 훅은 전부 여기. main.ts 의 useGlobalX 에 두면 AppModule 로 올린 테스트 앱과 달라진다.
+    // whitelist: 데코레이터 없는 필드 제거 · transform: DTO 클래스 인스턴스로 변환
+    { provide: APP_PIPE, useValue: new ValidationPipe({ whitelist: true, transform: true }) },
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
     // 전역 응답 로그(상태코드+소요시간). traceId 는 winston 포맷에서 자동 부착
     { provide: APP_INTERCEPTOR, useClass: ResponseLoggerInterceptor },
   ],

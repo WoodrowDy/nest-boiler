@@ -4,8 +4,8 @@ import typescriptEslint from "@typescript-eslint/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
 import prettierPlugin from "eslint-plugin-prettier";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -83,13 +83,15 @@ export default [
         "error",
         {
           case: "kebabCase",
-          ignore: ["^\\d+-.+\\.ts$"],
+          ignore: [String.raw`^\d+-.+\.ts$`],
         },
       ],
       // prefer-node-protocol 등 나머지 권장 규칙은 유지 (예: import "path" → "node:path" 자동수정)
       // --------------------------------------------------------
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": "warn",
+      // 실행하는 return 은 await 를 붙인다 — 스택에 호출자가 남고, try/catch 를 두를 때 뜻이 안 바뀐다.
+      "@typescript-eslint/return-await": ["error", "always"],
       "no-undef": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/explicit-function-return-type": "off",

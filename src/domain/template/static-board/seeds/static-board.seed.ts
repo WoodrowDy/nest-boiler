@@ -7,20 +7,15 @@ import { normalizePhone } from "src/global/helpers/phone.helper";
 export class StaticBoardSeeder implements Seeder {
   public async run(dataSource: DataSource, factoryManager: SeederFactoryManager) {
     //방식 1: Repository 패턴으로 고정 데이터 생성
-    const staticBoardRepository = new StaticBoardRepository(dataSource);
+    const staticBoardRepository = new StaticBoardRepository(dataSource.manager);
 
-    await dataSource.transaction(async (transactionManager) => {
-      await staticBoardRepository.createStaticBoard(
-        {
-          birth: new Date("2000-10-10"),
-          body: "초기 seed 목업 내용",
-          category: "공지사항",
-          isActivated: true,
-          writer: "김작가",
-          phone: normalizePhone("010-1234-5678"),
-        },
-        transactionManager
-      );
+    await staticBoardRepository.createStaticBoard({
+      birth: new Date("2000-10-10"),
+      body: "초기 seed 목업 내용",
+      category: "공지사항",
+      isActivated: true,
+      writer: "김작가",
+      phone: normalizePhone("010-1234-5678"),
     });
 
     // 🎲 방식 2: Factory로 랜덤 데이터 생성 (운영 환경에서는 생성하지 않음)

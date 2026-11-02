@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
 import { StaticBoardService } from "../services/static-board.service";
 import { ApiDoc } from "src/global/decorators/api-doc.decorator";
 import { GenerateStaticBoardPayload } from "../dtos/request/generate-static-board.dto";
@@ -10,7 +20,7 @@ import {
 import { StaticBoardMapper } from "../mappers/static-board.mapper";
 import { ObjectResponse } from "src/global/dtos/object-response.dto";
 import { ListResponse } from "src/global/dtos/list-response.dto";
-import { PaginatedQuery, Pagination } from "src/global/decorators/pagination-query.decorator";
+import { PaginationQuery } from "src/global/dtos/pagination.dto";
 import { ModifyStaticBoardPayload } from "../dtos/request/modify-static-board.dto";
 
 /**
@@ -45,10 +55,10 @@ export class StaticBoardController {
   @Get()
   async getStaticBoards(
     @Query() query: GetStaticBoardQuery,
-    @PaginatedQuery() pagination: Pagination
+    @Query() pagination: PaginationQuery
   ): Promise<ListResponse<StaticBoardListItemResponse[]>> {
     const { list, count } = await this.staticBoardService.readStaticBoardListAndCount(
-      query,
+      { ...query, isJoinUser: true },
       pagination
     );
 
@@ -65,7 +75,7 @@ export class StaticBoardController {
   })
   @Get("/:id")
   async getStaticBoard(
-    @Param("id") id: number
+    @Param("id", ParseIntPipe) id: number
   ): Promise<ObjectResponse<StaticBoardDetailResponse>> {
     const staticBoard = await this.staticBoardService.readStaticBoard({ id });
 
@@ -78,7 +88,7 @@ export class StaticBoardController {
   })
   @Patch("/:id")
   async patchStaticBoard(
-    @Param("id") id: number,
+    @Param("id", ParseIntPipe) id: number,
     @Body() payload: ModifyStaticBoardPayload
   ): Promise<void> {
     await this.staticBoardService.modifyStaticBoard(id, payload);
@@ -89,7 +99,7 @@ export class StaticBoardController {
     description: "테스트 보드 삭제",
   })
   @Delete("/:id")
-  async deleteStaticBoard(@Param("id") id: number): Promise<void> {
+  async deleteStaticBoard(@Param("id", ParseIntPipe) id: number): Promise<void> {
     await this.staticBoardService.removeStaticBoard(id);
   }
 }

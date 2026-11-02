@@ -3,7 +3,7 @@ import * as path from "node:path";
 
 // .env.test 파일 로드
 dotenv.config({
-  path: path.resolve(__dirname, "../envs/.env.test"),
+  path: path.resolve(__dirname, "../../envs/.env.test"),
 });
 
 console.log("Test environment loaded:", {

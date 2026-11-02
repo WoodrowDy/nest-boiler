@@ -14,7 +14,7 @@ NestJS + TypeScript + TypeORM + PostgreSQL boilerplate. Package manager: **pnpm*
 pnpm run build          # Production build (nest build)
 pnpm run start:local    # Local dev server (NODE_ENV=local, TZ=Asia/Seoul, --watch)
 pnpm run start:dev      # Dev server (NODE_ENV=dev)
-pnpm run start:prod     # Production (node dist/main)
+pnpm run start:prod     # Production (node dist/src/main — build lands in dist/src/ because envs/env.ts is outside src/)
 pnpm run typecheck      # tsc --noEmit (pre-commit does NOT run this)
 pnpm run format         # Prettier
 pnpm run lint           # eslint --fix
@@ -140,6 +140,20 @@ Documented in `README.md` and **mechanically enforced by ESLint** (`no-restricte
 - **DTOs derive from a single field contract.** `dtos/shared/*-fields.dto.ts` owns validation +
   Swagger; request/response DTOs derive via `PickType`/`PartialType`/`IntersectionType`. Do NOT
   derive DTOs from the entity.
+  - **The shape rule, whatever the domain: one response shape per endpoint, one definition per field
+    name. When the two collide, split the name.** Everything else follows — write the entity, list
+    the routes (that count is the number of response shapes), put the fields in the contract, derive
+    with `PickType`, give the mapper one method per shape.
+  - Only two kinds of collision exist, and each has one answer:
+    - **Same name, different shape** → different fields, different names. A detail `body` of 2,000
+      characters and a list preview of 100 are not one field; `body` and `bodyPreview` are. Reusing
+      the name forces the client to remember which endpoint it came from.
+    - **Output-only computed value** (`isCurrent`, a flattened join) → keep it out of the contract,
+      which owns validation and has nothing to validate here. Declare it on the response DTO itself
+      and have the service build it into a domain result type; the mapper copies it in one line.
+      Same precedent as `deletedAt` below.
+  - The rule does not decide **directory layout** (flat `request/`·`response/` here; endpoint folders
+    pay off past roughly ten routes) or **how many services and repositories a domain has**.
 - **Response DTOs are pure data** (no methods). Formatting/behavior goes to a util or the mapper.
   Audit fields (id/createdAt/updatedAt) come from `global/dtos/audit.response.ts`. **`deletedAt` is
   deliberately not there** — soft delete is an implementation detail, deleted rows are filtered out
@@ -175,8 +189,17 @@ Documented in `README.md` and **mechanically enforced by ESLint** (`no-restricte
     dangerous one — it ships straight to the client, breaking the closed default this layer exists
     to keep.
 - **Repository handles queries only.** Existence checks (404) and transaction boundaries live in the
-  service. Return type is always `Entity` / `Entity[]`; a single lookup returns `null` when nothing
-  matches. Repositories never throw and never wrap calls in `try/catch` (see Error Handling).
+  service. Reads return `Entity` / `Entity[]`, and a single lookup returns `null` when nothing
+  matches; writes return the affected row count, which is how the service learns about a miss
+  without a read. Repositories never throw and never wrap calls in `try/catch` (see Error Handling).
+  - **A repository is a plain `@Injectable()` that injects `EntityManager`.** It does not extend
+    TypeORM's `Repository`: that would hand `find`/`save`/`delete` to every injector beside the named
+    methods, and the naming table below would be a suggestion instead of the vocabulary. Taking only
+    an `EntityManager` also means it cannot open a transaction — joining is all it can do.
+  - **Every executing `return` is `return await`** (`@typescript-eslint/return-await: always`). The
+    repository method stays in the stack trace, and wrapping the call in `try/catch` later does not
+    change what it means. Building a query is not executing it: `buildFindQuery` returns a
+    `SelectQueryBuilder` and is not awaited; `getMany`/`save`/`findOneBy` are.
   - → ESLint also blocks `@nestjs/common` in `**/mappers/*.ts` (a mapper is a plain object, not a provider).
 
 Prettier config is a single source: `.prettierrc` (ESLint reads it, no inline options).
@@ -186,14 +209,15 @@ Prettier config is a single source: `.prettierrc` (ESLint reads it, no inline op
 ## Naming (CRUD)
 
 Each layer owns its own verbs, so a method name tells you which layer you are in. Form is
-`verb + Entity`; a list method that also returns a count is `...ListAndCount` (what `ListResponse`
-needs).
+`verb + Entity`. Two list reads: `...ListAndCount` takes an optional `PaginationQuery` and returns what
+`ListResponse` needs — without it, every row plus the count; `...List` is the unpaged `Entity[]` for
+callers inside the code (another service, a batch), so nobody fakes a page of 100 to mean "all".
 
 | Layer | create | read one | read list | update | delete |
 |---|---|---|---|---|---|
 | Controller | `postX` | `getX` | `getXs` | `patchX` | `deleteX` |
-| Service | `generateX` | `readX` | `readXListAndCount` | `modifyX` | `removeX` |
-| Repository | `createX` | `findX` | `findXListAndCount` | `updateX` | `softDeleteX` |
+| Service | `generateX` | `readX` | `readXList` · `readXListAndCount` | `modifyX` | `removeX` |
+| Repository | `createX` | `findX` | `findXList` · `findXListAndCount` | `updateX` | `softDeleteX` |
 
 `POST /static-boards` → `postStaticBoard` → `generateStaticBoard` → `createStaticBoard`.
 
@@ -242,17 +266,48 @@ error it succeeded; respond with the saved result or with values you already hol
 
 ## Transactions
 
-The transaction **boundary is the service**, not the repository. Repositories are transaction-aware
-but not transaction-owning: each method accepts an optional `transactionManager?: EntityManager` and
-resolves the manager once:
+The transaction **boundary is the service**, not the repository. Every service injects `DataSource`
+and is the only layer that can open a transaction; a repository injects `EntityManager` and can only
+join one. Repositories are transaction-aware but not transaction-owning: each method accepts an
+optional `transactionManager?: EntityManager` and resolves the manager once:
 
 ```ts
 const manager = transactionManager ?? this.manager;   // repo's own manager if none passed
 ```
 
+Service methods take the same optional `transactionManager?` and **only pass it through** to the
+repository (and to other services). That parameter is the propagation channel: a caller that owns a
+transaction hands its manager in, and everything below runs inside it.
+
 - If an external tx (`transactionManager`) is passed, join it as-is and just run (the owner/caller does commit/rollback/release). Otherwise:
-- Single-row op → call the repo without opening a transaction (single statement is atomic).
-- Multi-step / needs a lock → service opens a new transaction with `createQueryRunner()` (connect → startTransaction → commit/rollback → release) and passes the manager to each repo call so they share one transaction.
+- One statement → call the repo without opening a transaction (a single statement is atomic). An
+  existence check folds into the write: `UPDATE … WHERE id = :id AND deletedAt IS NULL`, and
+  `affected === 0` is the 404. A read-then-write pair inside a transaction does **not** close that
+  gap without a lock, so that is not what a transaction is for here.
+- Two or more writes that must be one unit → **define the transaction in the service, there and only
+  there**: open a `QueryRunner` (the form Nest's docs recommend) and pass `queryRunner.manager` down to
+  every repo call and to other services. The reference copy lives as a comment under
+  `generateStaticBoard`:
+
+```ts
+if (transactionManager) {
+  return await this.xRepository.createX(payload, transactionManager);   // join; the owner commits
+}
+const queryRunner = this.dataSource.createQueryRunner();
+await queryRunner.connect();
+await queryRunner.startTransaction();
+try {
+  const result = await this.xRepository.createX(payload, queryRunner.manager);
+  await this.otherService.generateOther(other, queryRunner.manager);
+  await queryRunner.commitTransaction();
+  return result;
+} catch (error) {
+  await queryRunner.rollbackTransaction();
+  throw error;
+} finally {
+  await queryRunner.release();
+}
+```
 
 ## Error Handling
 

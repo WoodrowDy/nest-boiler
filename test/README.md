@@ -9,8 +9,8 @@ test/
 ├── app.e2e-spec.ts            # 메인 E2E 테스트 진입점
 ├── utils/                     # 테스트 유틸리티 함수/헬퍼
 │   ├── e2e-setup.ts           # E2E 테스트 환경변수 설정 (Jest 자동 실행)
-│   └── e2e-helpers.ts         # 앱 실행/종료 헬퍼 함수들
-└── e2e-test/
+│   └── e2e-helper.ts         # 앱 실행/종료 헬퍼 함수들
+└── domain/
     └── {도메인}/
         ├── fixtures/          # 실제 API 호출/유틸 함수 모음
         │   └── {도메인}.fixture.ts
@@ -32,20 +32,20 @@ test/
 ```ts
 // test/utils/e2e-setup.ts
 import * as dotenv from 'dotenv';
-import * as path from 'path';
+import * as path from 'node:path';
 
 // .env.test 파일 로드
 dotenv.config({
-  path: path.resolve(__dirname, '../envs/.env.test'),
+  path: path.resolve(__dirname, '../../envs/.env.test'),
 });
 ```
 
-### utils/e2e-helpers.ts
+### utils/e2e-helper.ts
 
 - 테스트에서 반복적으로 사용되는 앱 실행/종료, 데이터베이스 초기화 함수들을 제공합니다.
 
 ```ts
-// test/utils/e2e-helpers.ts
+// test/utils/e2e-helper.ts
 export async function launchAppAndGetTestAppAndDb() {
   // 앱 실행 및 DB 초기화
 }
@@ -60,18 +60,18 @@ export async function closeTestApp(app) {
 - 예시: 게시판 생성, 리스트 조회, 상세 조회 등 API 호출 래퍼
 
 ```ts
-// test/e2e-test/static-board/fixtures/static-board.fixture.ts
-export class StaticBoardFixture {
-  static async generateStaticBoard(app, body) {
-    /* ... */
-  }
-  static async getStaticBoardListAndCount(app, query) {
-    /* ... */
-  }
-  static async getStaticBoard(app, id) {
-    /* ... */
-  }
-}
+// test/domain/static-board/fixtures/static-board.fixture.ts
+export const StaticBoardFixture = {
+  async generateStaticBoard(app, body) {
+    return await request(app.getHttpServer()).post(`/static-boards`).send(body);
+  },
+  async getStaticBoardListAndCount(app, query) {
+    return await request(app.getHttpServer()).get(`/static-boards`).query(query);
+  },
+  async getStaticBoard(app, id) {
+    return await request(app.getHttpServer()).get(`/static-boards/${id}`);
+  },
+};
 ```
 
 ### mocks/
@@ -80,7 +80,7 @@ export class StaticBoardFixture {
 - 예시: 게시판 생성에 사용할 DTO, 예시 데이터 등
 
 ```ts
-// test/e2e-test/static-board/mocks/static-board.mock.ts
+// test/domain/static-board/mocks/static-board.mock.ts
 export const generateStaticBoardMockDto = {
   birth: new Date('2000-10-10'),
   body: '초기 seed 목업 내용',
@@ -97,7 +97,7 @@ export const generateStaticBoardMockDto = {
 - 여러 fixture, mock을 조합해서 실제 유저의 행동을 시뮬레이션합니다.
 
 ```ts
-// test/e2e-test/static-board/scenarios/static-board.e2e-spec.ts
+// test/domain/static-board/scenarios/static-board.e2e-spec.ts
 describe(`static board test (e2e)`, () => {
   it(`테스트 게시판을 생성 할 수 있다`, async () => {
     const result = await StaticBoardFixture.generateStaticBoard(
@@ -125,7 +125,7 @@ pnpm run test:local
 ## 💡 Best Practices
 
 - **utils/e2e-setup.ts**: 테스트 환경변수 자동 로드, Jest 실행 전 초기 설정
-- **utils/e2e-helpers.ts**: 앱 실행/종료, DB 초기화 등 공통 헬퍼 함수들
+- **utils/e2e-helper.ts**: 앱 실행/종료, DB 초기화 등 공통 헬퍼 함수들
 - **fixtures/**: 테스트에서 반복적으로 쓰는 API 호출/유틸 함수 모음
 - **mocks/**: 테스트용 고정 데이터, DTO, 샘플 값
 - **scenarios/**: 실제 테스트 시나리오(플로우) 코드, 여러 fixture와 mock을 조합

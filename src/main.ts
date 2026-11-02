@@ -3,7 +3,7 @@ import { AppModule } from "./app.module";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import * as express from "express";
 import helmet from "helmet";
-import { ValidationPipe, VersioningType } from "@nestjs/common";
+import { VersioningType } from "@nestjs/common";
 import { join } from "node:path";
 import { commonConstants } from "./global/constants/common.constants";
 import { swaggerConstants } from "./global/constants/swagger.constants";
@@ -11,7 +11,6 @@ import basicAuth from "express-basic-auth";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { WINSTON_MODULE_NEST_PROVIDER } from "nest-winston";
 import { assertNoPendingMigrations } from "./global/helpers/pending-migrations.helper";
-import { HttpExceptionFilter } from "./global/filters/http-exception.filter";
 
 async function bootstrap() {
   // 스키마가 코드보다 뒤쳐진 채로 뜨지 않게 한다. 앱을 만들기 전에 본다.
@@ -61,27 +60,7 @@ async function bootstrap() {
    */
   // app.useGlobalInterceptors(new ResponseLoggerInterceptor(logger));
 
-  /**
-   * GlobalPipes
-   */
-  app.useGlobalPipes(
-    new ValidationPipe({
-      // When set to true, this will automatically remove non-whitelisted properties
-      // (those without any decorator in the validation class).
-      whitelist: true,
-      // Automatically transform payloads to be objects typed according to their DTO classes.
-      transform: true,
-    })
-  );
-
-  /**
-   * GlobalFilters
-   */
-  /**
-   * 전역 예외 필터 — 모든 에러 응답에 meta(traceId·timestamp)를 붙인다.
-   * 제약 위반(unique·FK)은 409 로 옮기고, 그 외 DB 에러는 500 으로 둔다.
-   */
-  app.useGlobalFilters(new HttpExceptionFilter());
+  // 전역 파이프·필터·인터셉터는 AppModule 의 APP_PIPE / APP_FILTER / APP_INTERCEPTOR 에 있다.
 
   app.enableShutdownHooks();
 

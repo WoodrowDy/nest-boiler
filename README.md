@@ -72,6 +72,7 @@ nest-boiler/
 
 - **엔티티 = 영속성 전용**: `@Column`·`@Index`·라이프사이클 훅만. `@ApiProperty`(Swagger)·`class-validator`(검증)·`@Transform`(입력 변환)을 두지 않습니다.
 - **검증 + Swagger의 단일 소스 = `dtos/shared` 필드 DTO**. request/response는 여기서 `PickType`/`PartialType` 등으로 파생합니다. (엔티티에서 파생하지 않음)
+  - **모양 규칙은 도메인이 복잡해져도 하나입니다 — 응답 모양은 엔드포인트마다 하나, 필드 정의는 이름마다 하나, 둘이 충돌하면 이름을 쪼갠다.** 충돌은 두 종류뿐입니다. 같은 이름인데 모양이 다르면 다른 필드이므로 이름을 나누고(`body` / `bodyPreview`), 응답에만 있는 계산값은 검증할 것이 없으니 계약 밖에 두고 응답 DTO에 직접 선언합니다(값은 서비스가 도메인 결과 타입으로 만들어 넘김). 상세 규칙은 `CLAUDE.md`의 레이어 규칙이 단일 소스입니다.
 - **응답 DTO = 순수 데이터**: 행위/포맷 메서드를 두지 않습니다. 필요하면 util 또는 mapper로.
 - **서비스는 HTTP 응답 DTO를 반환하지 않습니다**: 엔티티/도메인 모델을 반환하고, 엔티티→응답 변환은 **컨트롤러 경계에서 Mapper**로 수행합니다.
   - **응답을 위해 만들어야 하는 값**(계산·집계·다른 테이블에서 가져온 값)은 응답 DTO가 아니라 **도메인 결과 타입**에 담고, 그 타입은 **그 서비스 파일에 `export`** 합니다. HTTP 경계를 넘지 않으므로 DTO가 아니고, 만든 서비스가 소유자입니다.
@@ -143,8 +144,10 @@ domain/<name>/
 
 ### 트랜잭션 & 영속성
 
-- **트랜잭션 경계는 서비스**입니다. 레포는 트랜잭션을 소유하지 않고 참여만 — 각 메서드가 `transactionManager?`를 받아 `const manager = transactionManager ?? this.manager`로 매니저를 해석합니다.
-  - 외부 tx(`transactionManager`)를 받으면 그대로 합류해 실행(commit/rollback/release는 소유자 몫). 없으면 — 단건 op → 트랜잭션 없이 호출(단일 statement는 원자적), 다단계/락 → 서비스가 새 트랜잭션(`createQueryRunner()` → connect → startTransaction → commit/rollback → release)을 열어 각 레포에 매니저를 전달해 한 트랜잭션 공유.
+- **트랜잭션 경계는 서비스**입니다. 레포는 트랜잭션을 소유하지 않고 참여만 — 각 메서드가 `transactionManager?`를 받아 `const manager = transactionManager ?? this.manager`로 매니저를 해석합니다. 서비스 메서드도 같은 `transactionManager?` 를 받아 레포(와 다른 서비스)까지 **전달만** 합니다. 그 인자가 전파 통로입니다.
+  - 외부 tx(`transactionManager`)를 받으면 그대로 합류해 실행(commit/rollback/release는 소유자 몫). 없으면 — 문장 하나 → 트랜잭션 없이 호출(단일 statement는 원자적). 존재 확인은 쓰기에 접습니다: `UPDATE … WHERE id = :id AND deletedAt IS NULL` 의 `affected === 0` 이 404 입니다. 읽고-쓰기를 tx 로 감싸도 락 없이는 그 틈이 닫히지 않습니다. 쓰기가 둘 이상을 하나로 묶어야 할 때만 **서비스에서** `queryRunner` 를 정의해(Nest 문서 권장형) `queryRunner.manager` 를 레포와 다른 서비스에 넘깁니다. 참고 사본은 `generateStaticBoard` 아래 주석에 있습니다.
+  - **서비스는 `DataSource` 를 주입받아 트랜잭션을 여는 쪽, 레포는 `EntityManager` 만 주입받아 합류만 하는 쪽**입니다. 레포는 TypeORM `Repository` 를 상속하지 않습니다 — 상속하면 `find`/`save`/`delete` 가 주입받는 쪽에 그대로 열려 네이밍 표가 어휘가 아니라 선택지가 됩니다. 조회는 `Entity`/`Entity[]`(단건 미스는 `null`), 쓰기는 영향받은 행 수를 돌려줍니다.
+  - 목록 조회는 둘입니다. `readXListAndCount(query, pagination?)` 은 HTTP 목록용(`ListResponse` 가 필요한 것)이고 pagination 을 생략하면 전부와 count 를 돌려줍니다. `readXList(query)` 는 페이지 없이 전부 — 코드 안의 호출자(다른 서비스·배치)가 "전부" 를 위해 page=1, pageSize=100 을 꾸미지 않게 합니다.
 - **엔티티 훅 vs 쿼리 메서드**: `@BeforeInsert`/`@BeforeUpdate`는 **엔티티 기반 op(`save`/`softRemove`)에서만** 실행됩니다. 쿼리빌더 op(`update`/`insert`/`delete`/`softDelete`)는 훅을 건너뜁니다. `create()`는 인스턴스만 만들 뿐 훅을 태우지 않습니다.
 - **입력 정규화는 엔티티 훅이 아니라 DTO `@Transform`으로** 처리합니다 — 경로 독립적(save/update/seed 무관)이고 엔티티를 순수하게 유지. 예: 전화번호는 `normalizePhone`(`src/global/helpers/phone.helper.ts`)을 DTO `@Transform`과 시드가 공유합니다.
 
@@ -257,7 +260,7 @@ pnpm run start:local
 ```bash
 pnpm run start:local   # NODE_ENV=local, TZ=Asia/Seoul, --watch
 pnpm run start:dev     # NODE_ENV=dev  (envs/.env.dev 필요)
-pnpm run start:prod    # node dist/main
+pnpm run start:prod    # node dist/src/main — envs/env.ts 가 src 밖이라 빌드가 dist/src/ 로 떨어진다
 
 pnpm run build         # nest build → dist/
 pnpm run typecheck     # tsc --noEmit — pre-commit 은 돌리지 않으므로 직접 친다
