@@ -2,6 +2,8 @@
 
 작성 2026-11-02. 상태: **§1–§4 확정, §5–§8 제안(승인 전)**. 코드 변경은 아직 없다.
 
+> **2026-11-03 변경 이력** — 구현 계획(`docs/superpowers/plans/2026-11-03-users-boards-template-rewrite.md`)을 썼다. §5–§8 은 그대로 계획에 옮겼으니 계획 리뷰가 곧 이 섹션들의 확정이다. 계획이 스펙과 다르게 정한 것 둘: (1) 테이블 이름은 저장소 관례대로 `@Entity({ name: "User" | "Board", schema: process.env.DB_SCHEMA })` — §2 의 `users`/`boards` 가 아니다. (2) `removeBoard` 는 `addBoardCount(−1)` 에 userId 가 필요해서 트랜잭션 안에서 `readBoard` 를 먼저 한다(읽기 1 + 쓰기 2). (3) `UsersService.addBoardCount` 는 던지지 않고 affected 를 돌려준다 — 0 의 뜻은 호출한 boards 가 정한다(생성: 작성자 없음 → 404 `WRITER_NOT_FOUND`, 삭제: 탈퇴한 작성자 → 무시). 그래야 탈퇴한 사용자의 글도 지워진다(2026-11-03, 안 A).
+
 - 커밋·푸시·브랜치는 사용자가 한다. 코드 변경은 §5–§8 에 "확정" 이 붙은 뒤에 시작한다.
 - `docs/` 는 `.gitignore` 대상이다. 이 파일을 올리려면 `git add -f docs/superpowers/specs/2026-11-02-users-boards-template-rewrite-design.md`.
 - 기준 골격은 지금 스테이징된 `src/domain/template/static-board/` 다. 새 두 도메인은 이 모양을 그대로 따른다.
@@ -66,12 +68,12 @@
 
 | 라우트 | 호출 사슬 | 응답 | 비고 |
 |---|---|---|---|
-| POST /boards | `postBoard → generateBoard` | 201 `BoardSaveResponse` | body userId·title·content. **트랜잭션**: createBoard + addBoardCount(+1). 유저 없으면 404 → 롤백 |
+| POST /boards | `postBoard → generateBoard` | 201 `BoardSaveResponse` | body userId·title·content. **트랜잭션**: addBoardCount(+1) → createBoard. affected 0(유저 없음)이면 404 `WRITER_NOT_FOUND` → 롤백 |
 | GET /boards | `getBoards → readBoardListAndCount({ ...query, isJoinUser: true }, pagination)` | `ListResponse<BoardListItemResponse[]>` | 필터 userId·status·titleLike. content 없음 |
 | GET /boards/:id | `getBoard → readBoard({ id, isJoinUser: true })` | `BoardDetailResponse` | + content |
 | PATCH /boards/:id | `patchBoard → modifyBoard` | void | title·content |
 | POST /boards/:id/publish | `postPublishBoard → publishBoard` | void | `readBoard({ id })` → DRAFT 아니면 409 `NOT_DRAFT` → `modifyBoard(id, { status: PUBLISHED, publishedAt: new Date() })` |
-| DELETE /boards/:id | `deleteBoard → removeBoard` | void | **트랜잭션**: softDeleteBoard(0 → 404) + addBoardCount(−1) |
+| DELETE /boards/:id | `deleteBoard → removeBoard` | void | **트랜잭션**: readBoard → softDeleteBoard(0 → 404) → addBoardCount(−1; 탈퇴한 작성자면 0 행 — 무시) |
 
 - ID 파라미터는 `@Param("id", ParseIntPipe)`. 문자는 400. **0·음수는 통과시켜 404** 가 되게 둔다 — 키 타입은 맞고 행이 없는 것이다.
 - 쿼리스트링은 문자열로 온다(전역 파이프에 암묵 변환 없음). `BoardFields.userId` 에 `@Type(() => Number)` — static-board 의 `id` 와 같은 이유.
@@ -89,9 +91,9 @@
 - **조인 스위치**: `GetBoardQuery` 클래스에 `isJoinUser?: boolean` 을 **데코레이터 없이** 한 줄. Swagger 에 안 뜨고, 전역 `ValidationPipe({ whitelist: true })`(`src/app.module.ts`)가 클라이언트 입력을 지운다. 컨트롤러가 필요할 때 `{ ...query, isJoinUser: true }` 로 넣고, `buildFindQuery` 가 `if (isJoinUser) qb.leftJoinAndSelect("board.user", "user")`.
   **`whitelist: true` 가 이 설계의 전제다** — 끄면 `?isJoinUser=true` 가 문자열 `"true"` 로 레포까지 내려간다.
 - **LIKE**: `src/global/helpers/like.helper.ts` 에 `toLikePattern(term)` — `\` `%` `_` 이스케이프 후 `%term%`. 둘 다 쓴다. 지금 static-board 의 `` `%${x}%` `` 는 `%`·`_` 가 와일드카드로 먹는다.
-- **카운터**: `UsersRepository.addUserBoardCount(userId, delta, tm?)` = `manager.increment(User, { id: userId, deletedAt: IsNull() }, "boardCount", delta)` → `affected ?? 0`. `UsersService.addBoardCount(userId, delta, tm?)` 가 0 이면 `NotFoundException(USER_NOT_FOUND)`. 존재 확인이 UPDATE 한 문장에 접힌다.
+- **카운터**: `UsersRepository.addUserBoardCount(userId, delta, tm?)` = `manager.increment(User, { id: userId, deletedAt: IsNull() }, "boardCount", delta)` → `affected ?? 0`. `UsersService.addBoardCount(userId, delta, tm?): Promise<number>` 는 affected 를 그대로 돌려주고 **던지지 않는다** — 0 행의 뜻은 호출자만 안다(`generateBoard`: 작성자 없음 → `NotFoundException(WRITER_NOT_FOUND)`, `removeBoard`: 탈퇴한 작성자 → 무시). 존재 확인이 UPDATE 한 문장에 접힌다.
 - **쓰기**: `manager.update(X, { id, deletedAt: IsNull() }, payload)`, `manager.softDelete(X, id)` → affected. static-board 그대로.
-- **`BoardsService.generateBoard(payload, tm?)`**: CLAUDE.md 의 QueryRunner 블록 그대로(join 분기 → createQueryRunner → connect → startTransaction → try/commit → catch/rollback → finally/release). 본문만 `private runGenerate(payload, manager)` 로 빼서 두 분기가 같은 코드를 탄다. `removeBoard` 도 같은 형태.
+- **`BoardsService.generateBoard(payload, tm?)`**: CLAUDE.md 의 QueryRunner 블록 그대로(join 분기 → createQueryRunner → connect → startTransaction → try/commit → catch/rollback → finally/release). **private 헬퍼(`runGenerate`)로 빼지 않는다** — join 분기와 자체 트랜잭션 분기에 레포·서비스 호출을 각각 직접 쓴다(2026-11-03 결정: 줄 수보다 개념 수). 쓰기 순서는 **`addBoardCount(+1)` → `createBoard`**: 없는 사용자는 INSERT 의 FK(23503 → 409)가 아니라 increment 의 affected 0 → 404 로 걸려야 한다. `removeBoard` 도 같은 형태.
 - **`modifyBoard(id, values: Partial<Pick<Board, "title" | "content" | "status" | "publishedAt">>, tm?)`** 하나를 `patchBoard`(HTTP 는 title·content 만 담은 `ModifyBoardPayload`)와 `publishBoard` 가 같이 쓴다. 상태 규칙은 `publishBoard` 본문에만 있다(CLAUDE.md "base set knows nothing about state").
 
 ```ts
@@ -125,16 +127,21 @@ async findBoard({ id, ...query }: GetBoardByIdQuery, transactionManager?: Entity
 ```
 
 ```ts
-// boards.service.ts
+// boards.service.ts — private 헬퍼 없음. 두 분기에 같은 두 줄을 직접 쓴다.
 async generateBoard(payload: GenerateBoardPayload, transactionManager?: EntityManager): Promise<Board> {
   if (transactionManager) {
-    return await this.runGenerate(payload, transactionManager); // 합류 — commit 은 소유자 몫
+    // 합류 — commit/rollback/release 는 소유자 몫
+    const affected = await this.usersService.addBoardCount(payload.userId, 1, transactionManager);
+    if (affected === 0) throw new NotFoundException(constants.errorMessages.WRITER_NOT_FOUND);
+    return await this.boardsRepository.createBoard(payload, transactionManager);
   }
   const queryRunner = this.dataSource.createQueryRunner();
   await queryRunner.connect();
   await queryRunner.startTransaction();
   try {
-    const board = await this.runGenerate(payload, queryRunner.manager);
+    const affected = await this.usersService.addBoardCount(payload.userId, 1, queryRunner.manager);
+    if (affected === 0) throw new NotFoundException(constants.errorMessages.WRITER_NOT_FOUND); // → catch → 롤백
+    const board = await this.boardsRepository.createBoard(payload, queryRunner.manager);
     await queryRunner.commitTransaction();
     return board;
   } catch (error) {
@@ -143,12 +150,6 @@ async generateBoard(payload: GenerateBoardPayload, transactionManager?: EntityMa
   } finally {
     await queryRunner.release();
   }
-}
-
-private async runGenerate(payload: GenerateBoardPayload, manager: EntityManager): Promise<Board> {
-  const board = await this.boardsRepository.createBoard(payload, manager);
-  await this.usersService.addBoardCount(payload.userId, 1, manager); // affected 0 → 404 → 롤백
-  return board;
 }
 ```
 
@@ -187,7 +188,7 @@ private async runGenerate(payload: GenerateBoardPayload, manager: EntityManager)
 ## 6. 상수·에러 (제안)
 
 - `src/domain/users/users.constants.ts`: `USER_NOT_FOUND: "사용자를 찾을 수 없습니다."`, `DUPLICATE_EMAIL: "이미 사용 중인 이메일입니다."`
-- `src/domain/boards/boards.constants.ts`: `BOARD_NOT_FOUND: "게시글을 찾을 수 없습니다."`, `NOT_DRAFT: "초안 상태의 글만 발행할 수 있습니다."` + `BoardStatus` enum.
+- `src/domain/boards/boards.constants.ts`: `BOARD_NOT_FOUND: "게시글을 찾을 수 없습니다."`, `WRITER_NOT_FOUND: "작성자를 찾을 수 없습니다."`, `NOT_DRAFT: "초안 상태의 글만 발행할 수 있습니다."` + `BoardStatus` enum.
 - 409 변환은 `generateUser` 의 catch 에서 `isUniqueViolation` 로. 그 외 DB 에러는 잡지 않는다 — 전역 필터가 23505/23503 을 409 로, 나머지는 500 으로 보낸다.
 
 ## 7. 테스트 (제안)
