@@ -1,4 +1,11 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from "@nestjs/common";
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from "@nestjs/common";
 import { Response } from "express";
 import { QueryFailedError } from "typeorm";
 import { ResponseMeta } from "../dtos/response-meta";
@@ -30,11 +37,33 @@ const statusText = (status: number): string =>
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
     const { status, message, error } = this.resolve(exception);
 
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logServerError(exception);
+    }
+
     response.status(status).json({ message, error, statusCode: status, meta: new ResponseMeta() });
+  }
+
+  /**
+   * ★ 5xx 의 원인은 여기서 남긴다.
+   *   @Catch() 로 전부 잡으면 Nest 기본 핸들러(BaseExceptionFilter)가 불리지 않는다. 원래 스택을
+   *   찍던 곳이 그쪽이라, 이 줄이 없으면 500 은 응답 로그(HTTP RES)의 상태·시간 한 줄만 남긴다.
+   *   4xx 는 찍지 않는다 — 클라이언트 쪽 문제이고, 상태는 응답 로그에 이미 있다.
+   *   traceId 는 winston 포맷이 붙인다. 응답의 meta.traceId 로 이 줄을 찾는다.
+   */
+  private logServerError(exception: unknown): void {
+    if (exception instanceof Error) {
+      this.logger.error(exception.message, exception.stack);
+      return;
+    }
+
+    this.logger.error(String(exception));
   }
 
   private resolve(exception: unknown): { status: number; message: unknown; error: string } {

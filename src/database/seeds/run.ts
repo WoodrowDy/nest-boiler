@@ -1,7 +1,8 @@
 import { runSeeders } from "typeorm-extension";
 import { AppDataSource } from "../config/typeorm.config";
 import { MainSeeder } from "./main.seed";
-import { StaticBoardFactory } from "src/domain/template/static-board/seeds/static-board.factory";
+import { UserFactory } from "src/domain/template/users/seeds/user.factory";
+import { BoardFactory } from "src/domain/template/boards/seeds/board.factory";
 
 /**
  * 시드 실행 진입점.
@@ -29,7 +30,7 @@ async function run(): Promise<void> {
   try {
     await runSeeders(dataSource, {
       seeds: [MainSeeder],
-      factories: [StaticBoardFactory],
+      factories: [UserFactory, BoardFactory],
     });
   } finally {
     await dataSource.destroy();

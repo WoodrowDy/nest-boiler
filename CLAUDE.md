@@ -86,6 +86,11 @@ pnpm run test         # jest unit
 pnpm run test:cov     # coverage
 ```
 
+- Each e2e suite drops and re-synchronizes the test DB, then runs its `it`s top to bottom on that one
+  DB (`maxWorkers: 1`). **Do not assume ids are consecutive**: a failed INSERT (a 409) still consumes
+  a sequence value, so the next row skips one. Assert "a new row" (`id !== 1`) rather than an exact
+  id unless nothing before it can fail.
+
 ### First run (fresh clone)
 
 ```bash
@@ -116,16 +121,23 @@ src/
       request/     # payload / query (derived from shared)
       response/    # output-only (derived from shared + AuditResponse)
     mappers/       # Entity -> Response (stateless)
-    seeds/         # domain seed + factory
-  global/          # cross-cutting: constants, decorators, dtos, helpers, interceptors, middlewares, context, logger
-  database/        # typeorm.config.ts, migrations/, seeds/main.seed.ts, entities/ (core-hard/core-soft base)
+    seeds/         # domain seeder + factory
+    <name>.constants.ts / <name>.module.ts
+  domain/jwt/      # token verification middleware — no guard yet (see Known gaps)
+  global/          # cross-cutting: constants, context, decorators, dtos, enums, filters, helpers,
+                   # interceptors, interfaces, logger, middlewares
+  database/        # config/typeorm.config.ts, migrations/, seeds/ (main.seed.ts order, run.ts
+                   # factory registration), entities/ (core-hard/core-soft base)
 
 scripts/           # db-up/down/reset.sh, migration-lint.sh, migrate.sh, _db-env.sh,
                    # db-connect.sh.example (per-project DB reachability — tunnel/proxy/IAM)
 envs/              # env.ts (NODE_ENV -> file), .env.*.example (committed; .env.* are ignored)
 ```
 
-Reference implementation: **`src/domain/template/static-board/`** — copy this when adding a domain.
+Reference implementation: **`src/domain/template/users/`** (plain CRUD) and
+**`src/domain/template/boards/`** (a relation to users, a two-write transaction, a business action).
+Copy `users` when adding a domain; `boards` shows what to add once a domain touches another one.
+`template/` holds examples only.
 
 ---
 
@@ -148,7 +160,7 @@ Documented in `README.md` and **mechanically enforced by ESLint** (`no-restricte
     - **Same name, different shape** → different fields, different names. A detail `body` of 2,000
       characters and a list preview of 100 are not one field; `body` and `bodyPreview` are. Reusing
       the name forces the client to remember which endpoint it came from.
-    - **Output-only computed value** (`isCurrent`, a flattened join) → keep it out of the contract,
+    - **Output-only computed value** (`isCurrent`, an aggregate) → keep it out of the contract,
       which owns validation and has nothing to validate here. Declare it on the response DTO itself
       and have the service build it into a domain result type; the mapper copies it in one line.
       Same precedent as `deletedAt` below.
@@ -171,8 +183,9 @@ Documented in `README.md` and **mechanically enforced by ESLint** (`no-restricte
   - Listing every outgoing field by hand is the point. TS types do not exist at runtime and there is
     no `ClassSerializerInterceptor` here, so **what you don't write doesn't ship** (closed) — safer
     than `@Exclude` (open), where forgetting one leaks instead of omitting.
-  - → ESLint blocks `**/repositories/*`, `**/services/*`, `typeorm`, `async` and `Object.assign` in
-    `**/mappers/*.ts`; and `**/repositories/*` / `typeorm` in `**/controllers/*.ts`.
+  - → ESLint blocks `**/repositories/*`, `**/services/*`, `typeorm`, `@nestjs/common` (a mapper is a
+    plain object, not a provider), `async` and `Object.assign` in `**/mappers/*.ts`; and
+    `**/repositories/*` / `typeorm` in `**/controllers/*.ts`.
 - **One response shape per endpoint, not per domain.** A single shape converges on the largest one:
   the list ends up carrying whatever the detail needs, so every row ships a 2,000-character body and
   a phone number nobody asked for. Split the response DTO (`XListItemResponse`, `XDetailResponse`)
@@ -198,9 +211,16 @@ Documented in `README.md` and **mechanically enforced by ESLint** (`no-restricte
     an `EntityManager` also means it cannot open a transaction — joining is all it can do.
   - **Every executing `return` is `return await`** (`@typescript-eslint/return-await: always`). The
     repository method stays in the stack trace, and wrapping the call in `try/catch` later does not
-    change what it means. Building a query is not executing it: `buildFindQuery` returns a
+    change what it means. Building a query is not executing it: `buildSelectQuery` returns a
     `SelectQueryBuilder` and is not awaited; `getMany`/`save`/`findOneBy` are.
-  - → ESLint also blocks `@nestjs/common` in `**/mappers/*.ts` (a mapper is a plain object, not a provider).
+  - **`buildSelectQuery` holds the list filters; the single read adds `id` itself, unconditionally.**
+    `selectX({ id, ...query })` is `this.buildSelectQuery(query).andWhere("x.id = :id", { id })`, and the
+    filter builder has no `id` branch. A conditional `if (id !== undefined)` lets `0`, `undefined` or
+    a forgotten argument fall through to "the newest row": QueryBuilder does not reject them the way
+    find-options do. Next to `GetXQuery`, `export type GetXByIdQuery = GetXQuery & { id: number }`
+    makes `id` required at compile time for `selectX` / `readX` / `readXOrNull`.
+  - **User text in `LIKE` / `ILIKE` goes through `toLikePattern`** (`global/helpers/like.helper.ts`),
+    which escapes `%` `_` `\`. A bare `` `%${term}%` `` turns a typed `%` into "match everything".
 
 Prettier config is a single source: `.prettierrc` (ESLint reads it, no inline options).
 
@@ -208,25 +228,60 @@ Prettier config is a single source: `.prettierrc` (ESLint reads it, no inline op
 
 ## Naming (CRUD)
 
-Each layer owns its own verbs, so a method name tells you which layer you are in. Form is
-`verb + Entity`. Two list reads: `...ListAndCount` takes an optional `PaginationQuery` and returns what
-`ListResponse` needs — without it, every row plus the count; `...List` is the unpaged `Entity[]` for
-callers inside the code (another service, a batch), so nobody fakes a page of 100 to mean "all".
+Each layer takes its verbs from one source, so a method name tells you which layer you are in:
+**the controller speaks HTTP, the repository speaks SQL, the service uses plain CRUD verbs that
+neither of them uses.** Form is `verb + Entity`; list reads add `List` or `ListAndCount`, and the
+controller's list is `getXs`.
 
 | Layer | create | read one | read list | update | delete |
 |---|---|---|---|---|---|
 | Controller | `postX` | `getX` | `getXs` | `patchX` | `deleteX` |
-| Service | `generateX` | `readX` | `readXList` · `readXListAndCount` | `modifyX` | `removeX` |
-| Repository | `createX` | `findX` | `findXList` · `findXListAndCount` | `updateX` | `softDeleteX` |
+| Service | `createX` | `readX` | `readXList` · `readXListAndCount` | `modifyX` | `removeX` |
+| Repository | `insertX` | `selectX` | `selectXList` · `selectXListAndCount` | `updateX` | `softDeleteX` (`hardDeleteX`) |
 
-`POST /static-boards` → `postStaticBoard` → `generateStaticBoard` → `createStaticBoard`.
+```
+POST   /users      → postUser   → createUser           → insertUser
+GET    /users/:id  → getUser    → readUser             → selectUser
+GET    /users      → getUsers   → readUserListAndCount → selectUserListAndCount
+(in code)                       → readUserList         → selectUserList
+PATCH  /users/:id  → patchUser  → modifyUser           → updateUser
+DELETE /users/:id  → deleteUser → removeUser           → softDeleteUser
+```
 
-- **A service never uses an HTTP verb (`get`, `post`) or a SQL verb (`insert`, `find`, `update`).**
-  Seeing `find...` in a service means a repository method leaked upward. Service reads throw on a
-  miss, so there is no `OrThrow` suffix either (see Error Handling).
-- **`softDeleteX` names what it does** (`manager.softDelete`, `@DeleteDateColumn`). It also keeps the
-  repository from colliding with the controller's `deleteX`. A `CoreHardEntity` domain uses
-  `hardDeleteX`.
+- **Controller = the HTTP method** (`post` / `get` / `patch` / `delete`), so the name says which
+  request it handles.
+- **Repository = the SQL operation** (`insert` / `select` / `update`). Deletion names what actually
+  happens instead: `softDeleteX` (`manager.softDelete`, `@DeleteDateColumn`), and `hardDeleteX` in a
+  `CoreHardEntity` domain. The SQL verb would make it `deleteX`, which is the controller's name.
+- **Service = `create` / `read` / `modify` / `remove`.** `read` is not a different operation from
+  `select`, nor `modify` from `update`; the words are split by layer, not by meaning, so that a name
+  identifies its layer. `generate` is left for producing an artifact (a token, a report), not for
+  creating a row.
+- **This is the project's convention, not something Nest or TypeORM imposes.** It applies to methods
+  the project defines; TypeORM's own API keeps its names, and a custom method does not have to match
+  the ORM call inside it — `selectX` may well call `findOne` / `getOne`.
+- **Writes outside CRUD follow the same split.** A counter is `UPDATE … SET boardCount = boardCount +
+  :delta`, so the repository says `updateUserBoardCount`; the service says what it means to the
+  business, `addBoardCount`.
+- **ESLint enforces the split** (`no-restricted-syntax` per layer in `eslint.config.mjs`): a method in
+  `**/services/*.ts` never starts with a controller or repository verb (`get`, `post`, `insert`,
+  `select`, `find`, `update`, …), and so on for each layer. It
+  is a ban list, not an allow list — business verbs (`publishBoard`, `addBoardCount`) and helpers
+  (`buildSelectQuery`) pass. `generate` is not banned in services, because of the artifact case.
+- **List reads.** `...ListAndCount` takes an optional `PaginationQuery`: with it, that page plus the
+  count of every matching row; without it, every matching row plus the count. `...List` is the
+  unpaged `Entity[]` for callers inside the code (another service, a batch). Never pass a large page
+  size to mean "all".
+- Service reads throw on a miss, so there is no `OrThrow` suffix (see Error Handling).
+- **Request DTOs are named after the endpoint:** HTTP verb + singular entity + `Payload` / `Query` —
+  `PostUserPayload` (`post-user.dto.ts`), `PatchUserPayload`, `GetUserQuery`, plus
+  `GetUserByIdQuery = GetUserQuery & { id: number }`. They are the HTTP contract (Swagger + the
+  validation pipe), so they carry the endpoint's name into the service signature
+  (`createUser(payload: PostUserPayload)`); the verb ban above is about method names, not types. A values type the service builds itself (`ModifyBoardValues`) is not a request DTO.
+- **Plural for the module's parts, singular for the thing.** `UsersController`, `UsersService`,
+  `UsersRepository`, `UsersModule`, `users.service.ts`, route `users`; but `User`, `UserFields`,
+  `UserMapper`, `UserSeeder`, `UserFactory`, `user.entity.ts`, `PostUserPayload`. Use the real
+  English plural (`CategoriesService`, `categories`).
 - **Business actions get a business verb**, built on the CRUD set. The controller endpoint is the
   HTTP verb plus the service method name — `POST /notices/:id/publish` → `postPublishNotice` →
   `publishNotice`. In a service, `this.modifyX` means the base set, `this.xRepository.updateX` means
@@ -259,10 +314,10 @@ error it succeeded; respond with the saved result or with values you already hol
 - Reads go to a replica under replication, so a read right after a write can land before the row has
   replicated: a 404 for the row you just created, or pre-update values. It never reproduces on a
   single local DB, so it only shows up in production.
-- `createX` can return the entity because `manager.save()` gives it back, defaults included.
+- `insertX` can return the entity because `manager.save()` gives it back, defaults included.
   `updateX` cannot — `manager.update()` returns an `UpdateResult`, and query-builder writes skip
   `@BeforeUpdate`. So an update path must not promise fields the DB or a hook computes. Returning
-  `void` (what `patchStaticBoard` does) is the honest default.
+  `void` (what `patchUser` does) is the honest default.
 
 ## Transactions
 
@@ -279,35 +334,51 @@ Service methods take the same optional `transactionManager?` and **only pass it 
 repository (and to other services). That parameter is the propagation channel: a caller that owns a
 transaction hands its manager in, and everything below runs inside it.
 
-- If an external tx (`transactionManager`) is passed, join it as-is and just run (the owner/caller does commit/rollback/release). Otherwise:
+- A passed `transactionManager` is joined as-is: run on it; commit/rollback/release belong to whoever
+  opened it. Otherwise:
 - One statement → call the repo without opening a transaction (a single statement is atomic). An
   existence check folds into the write: `UPDATE … WHERE id = :id AND deletedAt IS NULL`, and
   `affected === 0` is the 404. A read-then-write pair inside a transaction does **not** close that
   gap without a lock, so that is not what a transaction is for here.
-- Two or more writes that must be one unit → **define the transaction in the service, there and only
-  there**: open a `QueryRunner` (the form Nest's docs recommend) and pass `queryRunner.manager` down to
-  every repo call and to other services. The reference copy lives as a comment under
-  `generateStaticBoard`:
+- Two or more writes that must be one unit → **the method that needs the transaction opens it, there
+  and only there**: a `QueryRunner` (the form Nest's docs recommend), with `queryRunner.manager` passed
+  down to every repo call and to other services. Reference: `BoardsService.createBoard` /
+  `removeBoard`.
+- **A method that opens a transaction does not take `transactionManager`**; every other service
+  method does. Taking it "for uniformity" either ignores it (the caller believes it joined, and it did
+  not) or needs a join branch that repeats the body.
 
 ```ts
-if (transactionManager) {
-  return await this.xRepository.createX(payload, transactionManager);   // join; the owner commits
-}
-const queryRunner = this.dataSource.createQueryRunner();
-await queryRunner.connect();
-await queryRunner.startTransaction();
-try {
-  const result = await this.xRepository.createX(payload, queryRunner.manager);
-  await this.otherService.generateOther(other, queryRunner.manager);
-  await queryRunner.commitTransaction();
-  return result;
-} catch (error) {
-  await queryRunner.rollbackTransaction();
-  throw error;
-} finally {
-  await queryRunner.release();
+async createX(payload: PostXPayload): Promise<X> {
+  const queryRunner = this.dataSource.createQueryRunner();
+  await queryRunner.connect();
+
+  try {
+    await queryRunner.startTransaction();   // inside try: if starting fails, finally still releases
+
+    const result = await this.xRepository.insertX(payload, queryRunner.manager);
+    await this.otherService.createOther(other, queryRunner.manager);
+
+    await queryRunner.commitTransaction();
+    return result;
+  } catch (error) {
+    await queryRunner.rollbackTransaction();
+    throw error;
+  } finally {
+    await queryRunner.release();
+  }
 }
 ```
+
+- **When an opener later has to run inside a caller's transaction**, give it `transactionManager?`
+  then and branch on it: passed → run on it and leave commit/rollback/release to the owner; not passed
+  → open as above. Add the branch when that caller exists, not before. Until then, calling an opener
+  from inside another transaction runs it on a second connection — not atomic with the caller, and it
+  hangs on any row the caller has already locked.
+- **Inside a transaction, run first the write that can report "missing".** `createBoard` increments
+  the author's `boardCount` (`affected === 0` → 404) before it inserts the board. In the other order
+  the INSERT fails on the foreign key (23503), which the global filter turns into 409 — the wrong
+  status for "no such author", and the INSERT already spent a sequence value.
 
 ## Error Handling
 
@@ -328,10 +399,16 @@ Rules:
   count does not change. Use it wherever a miss is a normal outcome: a duplicate check, an upsert, a
   nullable relation, a batch that skips what it cannot find.
 - **A domain is entered through its service, never its repository.** ESLint blocks
-  `src/domain/*/**/repositories/*` inside `**/services/*.ts`, so another domain cannot reach past
-  the transaction boundary and the existence check. Own-domain imports use `../repositories/*` and
-  are unaffected. That restriction is why `readXOrNull` exists rather than letting callers reach for
-  `findX` themselves.
+  `src/domain/*/**/repositories/*` inside `**/services/*.ts` and `**/repositories/*.ts`, so another
+  domain cannot reach past the transaction boundary and the existence check. Own-domain imports use
+  `../repositories/*` and are unaffected. That restriction is why `readXOrNull` exists rather than
+  letting callers reach for `selectX` themselves.
+- **A write that another domain composes into its transaction returns `affected` instead of
+  throwing, when only the caller knows what zero rows means.** `UsersService.addBoardCount` returns
+  the count: `createBoard` turns 0 into 404 (`WRITER_NOT_FOUND`), `removeBoard` ignores it (the
+  author withdrew, and the board must still go). Throwing in the callee picks one meaning for both
+  callers, and the wrong one rolls back a legitimate delete. Ordinary writes (`modifyX`, `removeX`)
+  still throw — their zero has one meaning.
 - No `try/catch` in repositories. Wrapping hides the cause and stops the service from telling a
   duplicate from an outage.
 - Translate DB constraint errors **at the catch site** using `src/global/helpers/db-error.helper.ts`
@@ -356,6 +433,10 @@ catch sites above rely on:
   still preferred — only there does a domain message exist.
 - **Unknown errors never leak their text.** The body is a generic message; stack and driver text
   (which name tables and columns) stay in the log. `meta.traceId` is what ties the two together.
+- **The filter logs every 5xx itself, with its stack.** A catch-all `@Catch()` replaces Nest's default
+  handler, and that handler is what used to log it — without the filter's log line a 500 leaves only
+  the `HTTP RES … 500` access line, and the traceId leads nowhere. 4xx are not logged there; the access
+  log already has the status.
 
 ## TypeORM hooks vs query methods
 
@@ -379,15 +460,16 @@ catch sites above rely on:
 - **Logging**: Winston (`global/logger/winston.config.ts`) via `app.useLogger`. Every log line gets
   the request's traceId automatically. Access logs: `RequestLoggerMiddleware` (`HTTP REQ`) and
   `ResponseLoggerInterceptor` (`HTTP RES`, status + duration; level = info/warn/error by status).
+  Every 5xx is also logged by the global filter with its stack (see Error Handling). TypeORM's own
+  query logging is off (`logging: false` in `typeorm.config.ts`).
 - Swagger: use the `@ApiDoc` decorator. It documents the success response and auto-includes standard
-  error responses (400/401/403/404/500). Available at `/api-docs`.
+  error responses (400/401/403/404/500). Available at `/api-docs`. Outside `local` it sits behind
+  Basic auth, and the app refuses to boot without `SWAGGER_USER` / `SWAGGER_PASSWORD`.
 
 ---
 
 ## Conventions Recap
 
-- Errors thrown as Nest `HttpException`s (`NotFoundException`/`ConflictException`/… with messages from
-  the domain's `*.constants.ts`) — from services only. See Error Handling.
 - Migrations: entity change → `migration:generate` (auto), data/manual → `migration:create`.
   - **Never edit an applied migration** — add a new one. In VS Code, `src/database/migrations/**` is
     marked **read-only** (`.vscode/settings.json` → `files.readonlyInclude`), so trying to edit a
@@ -404,13 +486,14 @@ catch sites above rely on:
     `cross-env` and let the caller set `NODE_ENV`, which is exactly how `migrate.sh` works. It is
     left closed because `migrate.sh` also prints the target, makes you type the env name, and
     refuses without a TTY — unpinning the seed without those guards means one line
-    (`NODE_ENV=prod pnpm run seed`) writes to production with no confirmation. Add a `seed.sh`
+    (`NODE_ENV=prod pnpm run seed:run`) writes to production with no confirmation. Add a `seed.sh`
     with the same guards if a real need shows up; before that, essential reference data usually
     belongs in a migration anyway, where ordering, revert and the boot guard already cover it.
   - Factory (random) data is guarded by `NODE_ENV !== "prod"` in the seeder itself, so that branch
     only matters once such a path exists.
 - Environments: `local | dev | prod | test`, files in `envs/` selected by `NODE_ENV` (`envs/env.ts`).
-  `.env.*` are git-ignored; `.env.*.example` are committed templates.
+  `.env.local` / `.env.dev` / `.env.prod` / `.env.docker` are git-ignored; `.env.test` (e2e) and the
+  `.env.*.example` templates are committed. `app.module.ts` validates the env with Joi at boot.
 
 ---
 
@@ -422,8 +505,19 @@ catch sites above rely on:
 
 ---
 
-## Backlog
+## Known gaps
 
-Open items and "adopt from cmes-server when triggered" candidates are tracked in
-`docs/TODO.md` and `docs/cmes-adoption-candidates.md` (both git-ignored, local notes).
-Top P1: real auth flow (`JwtModule`/`JwtMiddleware` may be stubs), stricter env validation.
+What the boilerplate does not do yet. Check this list before treating a behaviour as covered.
+
+- **No auth guard.** `JwtMiddleware` runs on every route: a valid `Bearer` token attaches
+  `req.session`, an invalid one is 403, and no token passes straight through. Nothing blocks an
+  unauthenticated request — add a guard before exposing anything that needs a user.
+- **`strictNullChecks` is off.** Turning it on (and fixing what it reports) is planned as its own
+  change, so the before/after can be compared.
+- **DB query logging is off, and three env keys do nothing.** `typeorm.config.ts` hardcodes
+  `logging: false`; `DB_LOGGING`, `DB_MAX_QUERY_EXECUTION` and `USE_LOCAL_HTTPS_OPTIONS` are validated
+  but never read; `CustomDbLogger` exists but is not wired. 5xx are still logged by the filter.
+- **`@ApiDoc` does not list 409** among its standard errors, although the filter returns 409 for
+  constraint violations.
+
+Local backlog notes live in `docs/TODO.md` and `docs/cmes-adoption-candidates.md` (git-ignored).

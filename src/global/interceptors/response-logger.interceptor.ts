@@ -15,7 +15,7 @@ import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from "nest-winston";
  * - 성공/실패 모든 응답의 상태코드 + 소요시간(latency)을 로깅한다. (응답 body 는 변형/기록하지 않음)
  * - 레벨 분기: 2xx/3xx → info, 4xx → warn(클라이언트 오류), 5xx → error.
  * - traceId 는 winston 포맷에서 자동 부착됨(RequestContext/ALS).
- * - 5xx 의 상세 스택은 ExceptionsHandler/필터가 별도로 남긴다(상호보완).
+ * - 5xx 의 상세 스택은 전역 필터(HttpExceptionFilter)가 남긴다(상호보완). 여기는 상태·시간만.
  */
 @Injectable()
 export class ResponseLoggerInterceptor implements NestInterceptor {

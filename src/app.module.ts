@@ -22,7 +22,8 @@ import { RequestLoggerMiddleware } from "./global/middlewares/request-logger.mid
 import { WinstonModule } from "nest-winston";
 import { winstonConfig } from "./global/logger/winston.config";
 import { JwtModule } from "./domain/jwt/jwt.module";
-import { StaticBoardModule } from "./domain/template/static-board/static-board.module";
+import { UsersModule } from "./domain/template/users/users.module";
+import { BoardsModule } from "./domain/template/boards/boards.module";
 
 @Module({
   imports: [
@@ -79,8 +80,9 @@ import { StaticBoardModule } from "./domain/template/static-board/static-board.m
     JwtModule.forRoot({
       jwtSecret: process.env.JWT_SECRET,
     }),
-    //Templates
-    StaticBoardModule,
+    //Templates — 복사해서 쓰는 예시 도메인.
+    UsersModule,
+    BoardsModule,
   ],
   controllers: [AppController],
   providers: [

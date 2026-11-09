@@ -12,8 +12,7 @@ src/
 │   └── seeds/                  # 시드 파일들
 │       └── main.seed.ts        # 메인 시드 (모든 시드 통합 관리)
 └── domain/
-    └── */seeds/                # 도메인별 시드들
-        ├── README.md           # 도메인 시드 가이드
+    └── {도메인}/seeds/         # 도메인별 시드들 (예시: template/users/seeds, template/boards/seeds)
         ├── {도메인}.seed.ts    # 필수 데이터 시드
         └── {도메인}.factory.ts # 랜덤 데이터 팩토리 (선택)
 ```
@@ -132,31 +131,35 @@ pnpm migrate:revert:dev    # 마지막 한 건 철회 (revert-dev 를 입력)
 
 ### 2.1. 시드 데이터가 필요하다면 시드 파일 생성
 
-- 도메인별 시드: `src/domain/{도메인}/seeds/{도메인}.seed.ts` 생성
-- 각 도메인의 `seeds` 폴더 README.md 참조
+- 도메인별 시드: `src/domain/{도메인}/seeds/{도메인}.seed.ts` 생성 (예시: `src/domain/template/users/seeds/user.seed.ts`)
+- 팩토리를 만들었으면 `src/database/seeds/run.ts` 의 `factories` 에도 등록합니다 — 글로브가 아니라 클래스로 넘기기 때문입니다(이유는 그 파일 주석)
+- **다른 테이블과 같이 바뀌는 데이터는 레포가 아니라 서비스로 넣습니다.** 글은 작성자의 `boardCount` 와 한 트랜잭션이라, `BoardSeeder` 는 서비스를 손으로 조립해 `createBoard` 를 탑니다. 레포로 바로 넣으면 글만 생기고 카운트가 0 으로 남습니다
 
 ### 2.2. 시드 파일 작성 예시
 
 ```typescript
-// src/domain/static-board/seeds/static-board.seed.ts
-export class StaticBoardSeeder implements Seeder {
+// src/domain/template/users/seeds/user.seed.ts
+export class UserSeeder implements Seeder {
   public async run(dataSource: DataSource, factoryManager: SeederFactoryManager) {
-    const repository = new StaticBoardRepository(dataSource);
-
-    // 필수 데이터 생성
-    await repository.createStaticBoard({
-      category: "공지사항",
-      writer: "관리자",
-      // ... 데이터
-    });
+    // 필수 데이터 — 다른 테이블을 건드리지 않으니 레포로 바로 넣는다
+    const usersRepository = new UsersRepository(dataSource.manager);
+    await usersRepository.insertUser(SEED_ADMIN);
 
     // 운영 외 환경에서만 더미 데이터 생성
     if (process.env.NODE_ENV !== "prod") {
-      const factory = factoryManager.get(StaticBoard);
-      await factory.saveMany(10);
+      await factoryManager.get(User).saveMany(5);
     }
   }
 }
+```
+
+```typescript
+// src/domain/template/boards/seeds/board.seed.ts — 서비스를 거쳐야 boardCount 가 맞는다
+const usersService = new UsersService(new UsersRepository(manager), dataSource);
+const boardsService = new BoardsService(new BoardsRepository(manager), usersService, dataSource);
+
+const draft = await factoryManager.get(Board).make(); // 저장하지 않는다 — 값만
+await boardsService.createBoard({ userId, title: draft.title, content: draft.content });
 ```
 
 ### 2.3. MainSeeder에 시드 등록
@@ -167,11 +170,9 @@ export class MainSeeder implements Seeder {
   public async run(dataSource: DataSource, factoryManager: SeederFactoryManager) {
     console.log("🌱 Starting seeding process...");
 
-    // 도메인별 시드들을 순서대로 실행
-    const staticBoardSeeder = new StaticBoardSeeder();
-    await staticBoardSeeder.run(dataSource, factoryManager);
-
-    // 추가 도메인 시드들...
+    // 도메인별 시드들을 FK 순서대로 실행 — 글은 작성자를 참조하므로 사용자가 먼저
+    await new UserSeeder().run(dataSource, factoryManager);
+    await new BoardSeeder().run(dataSource, factoryManager);
 
     console.log("✅ All seeding completed!");
   }
@@ -255,7 +256,7 @@ migrate.sh     NODE_ENV="$ENV" pnpm run typeorm ...            환경 지정
 > 환경값은 이 프로젝트 기준 `local | dev | prod | test` 입니다(`development`/`production` 아님).
 
 > **필수 데이터와 더미의 구분은 `NODE_ENV` 가 아니라 시더 코드가 합니다.**
-> `static-board.seed.ts` 가 `NODE_ENV !== "prod"` 일 때만 팩토리를 돌립니다 — 로컬에서
+> `user.seed.ts` · `board.seed.ts` 가 `NODE_ENV !== "prod"` 일 때만 팩토리를 돌립니다 — 로컬에서
 > 그 분기를 시험하려면 시더를 직접 고쳐야 합니다.
 
 ---
@@ -317,16 +318,15 @@ pnpm run setup-db                   # 마이그레이션 + 시드 한 번에 실
 - ✅ 도메인별 시드 파일 분리
 - ✅ MainSeeder에서 모든 시드 통합 관리
 - ✅ 환경별 조건부 실행 구현 (`NODE_ENV` 활용)
-- ✅ Repository 패턴 활용으로 비즈니스 로직 재사용
+- ✅ 혼자 바뀌는 데이터는 레포로, 다른 테이블과 같이 바뀌는 데이터는 서비스로 넣기(`BoardSeeder`)
 - ✅ 시드 팩토리(`*.factory.ts` — faker 랜덤 데이터)는 `prod` 외에서만 사용
       가드가 `NODE_ENV !== "prod"` 이므로 `local`·`dev`·`test` 전부에서 돕니다
 - ❌ `prod` 에서 시드 팩토리 사용 금지 — 운영 DB 에 가짜 데이터가 들어갑니다
 
 ### 📁 시드 관리
 
-- ✅ 새 도메인 추가 시 MainSeeder에 등록
+- ✅ 새 도메인 추가 시 MainSeeder에 등록, 팩토리는 `run.ts` 의 `factories` 에도 등록
 - ✅ 의존성 순서 고려한 시드 실행 순서
-- ✅ 각 도메인 시드 폴더에 README.md 작성
 
 ---
 
@@ -353,7 +353,7 @@ pnpm run setup-db
 
 ```bash
 1. 도메인별 시드 파일 생성
-2. MainSeeder에 새 시드 등록
+2. MainSeeder에 새 시드 등록 (팩토리는 run.ts 의 factories 에도)
 3. pnpm run seed:run
 ```
 
@@ -388,7 +388,7 @@ A: `*.factory.ts` 에서 모든 필수 필드(NOT NULL)를 채웠는지 확인�
 
 ### 시드 관련
 
-- **새 시드 추가**: MainSeeder에 등록 필수
+- **새 시드 추가**: MainSeeder에 등록 필수. 팩토리는 `run.ts` 의 `factories` 에도 — 빠지면 `factoryManager.get(X)` 가 실패합니다
 - **실행 순서**: 의존성을 고려한 순서로 MainSeeder에서 관리
 - **환경별 실행**: `NODE_ENV` 환경 변수 활용
 

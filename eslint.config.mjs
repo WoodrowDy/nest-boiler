@@ -15,6 +15,9 @@ const compat = new FlatCompat({
   recommendedConfig: js.configs.recommended,
 });
 
+/** 메서드 이름이 이 동사 + 대문자로 시작하면 걸린다 (createUser 는 걸리고 created 는 안 걸린다). */
+const bannedMethodVerbs = (verbs) => `MethodDefinition[key.name=/^(${verbs.join("|")})[A-Z]/]`;
+
 export default [
   {
     ignores: [
@@ -201,6 +204,90 @@ export default [
             },
           ],
           paths: [{ name: "typeorm", message: "컨트롤러는 DB 를 모른다 — 서비스를 통한다" }],
+        },
+      ],
+    },
+  },
+  // 이름 = 레이어. 메서드 이름의 동사만 보고 어느 레이어인지 알게 한다.
+  //   Controller = HTTP 동사(post · get · patch · delete)
+  //   Service    = create · read · modify · remove (+ 업무 동사)
+  //   Repository = SQL 동사(insert · select · update) + softDelete · hardDelete
+  //
+  // ★ 허용 목록이 아니라 "다른 레이어의 동사" 금지 목록이다. publishBoard · addBoardCount 같은
+  //   업무 동사와 buildSelectQuery 같은 헬퍼는 그대로 통과한다.
+  // ★ 서비스에서 generate 는 막지 않는다 — 토큰 · 보고서 같은 산출물 생성의 업무 동사다.
+  // ★ no-restricted-syntax 는 블록끼리 합쳐지지 않는다. 같은 파일에 두 블록이 걸리면 뒤의 것만 남으니
+  //   레이어 글롭을 겹치게 만들지 않는다.
+  {
+    files: ["**/services/*.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: bannedMethodVerbs([
+            "insert",
+            "select",
+            "update",
+            "find",
+            "softDelete",
+            "hardDelete",
+            "get",
+            "post",
+            "patch",
+            "put",
+            "delete",
+          ]),
+          message:
+            "서비스 동사는 create · read · modify · remove, 그 밖에는 업무 동사(publishX 등)",
+        },
+      ],
+    },
+  },
+  {
+    files: ["**/repositories/*.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: bannedMethodVerbs([
+            "create",
+            "read",
+            "modify",
+            "remove",
+            "generate",
+            "find",
+            "delete",
+            "get",
+            "post",
+            "patch",
+            "put",
+          ]),
+          message: "레포 동사는 SQL — insert · select · update · softDelete · hardDelete",
+        },
+      ],
+    },
+  },
+  {
+    files: ["**/controllers/*.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: bannedMethodVerbs([
+            "create",
+            "read",
+            "modify",
+            "remove",
+            "generate",
+            "insert",
+            "select",
+            "update",
+            "find",
+            "softDelete",
+            "hardDelete",
+          ]),
+          message:
+            "컨트롤러 이름은 HTTP 동사 + 서비스 메서드 — postX · getX · patchX · deleteX · postPublishX",
         },
       ],
     },
