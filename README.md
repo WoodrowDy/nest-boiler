@@ -57,7 +57,8 @@ test/
     mocks/                # 목 데이터
     scenarios/            # e2e 시나리오
 scripts/                  # db-up/down/reset, migration-lint, migrate(배포 환경), _db-env,
-                          # db-connect.sh.example(터널 등 DB 접근 — 프로젝트가 복사해 씀)
+                          # db-connect.sh.example(터널 등 DB 접근 — 프로젝트가 복사해 씀),
+                          # postgres/init-extra-dbs.sh(컨테이너 최초 기동 때 DB 생성)
 envs/                     # env.ts(NODE_ENV → 파일 선택), .env.*.example
 DEPLOY.md                 # 배포 가이드
 ```
@@ -285,9 +286,11 @@ pnpm migrate:revert:dev   # 마지막 한 건 철회 (revert-dev 를 입력)
 
 ## 배포
 
-배포 방식은 인프라마다 달라 강제하지 않습니다. 권장하는 모양과 이유는 [`DEPLOY.md`](DEPLOY.md) 에 있습니다.
+[`DEPLOY.md`](DEPLOY.md) 는 **비용을 아끼는 EC2 한 대 + pm2** 를 기준으로 썼습니다. 컨테이너로 가면
+GitHub Actions(CI/CD)를 권하고, 그 경로도 같은 문서에 있습니다.
 
-- **마이그레이션은 배포와 분리합니다.** 서버에 ssh 로 들어가 `migrate:*` 로 돌립니다.
+- **EC2 + pm2 에서는 마이그레이션을 사람이 따로 돌립니다.** 서버에 ssh 로 들어가 `migrate:*` 로 돌립니다.
+- **컨테이너 · CI 에서는 파이프라인 단계로 넣어도 됩니다.** 빈 DB 에 선행 테스트를 하고, 적용은 승인 게이트 뒤에 둡니다.
 - **순서는 마이그레이션 → 배포**입니다. 거꾸로 하면 앱이 부팅을 거부합니다.
 
 ## 아직 없는 것

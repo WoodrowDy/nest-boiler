@@ -1,23 +1,26 @@
 # 배포 가이드라인
 
-> **이 보일러플레이트는 배포 방식을 강제하지 않습니다.** 인프라는 프로젝트마다 다르기 때문에
-> `deploy.sh` 같은 스크립트를 미리 넣어두지 않았습니다. 대신 **"이렇게 하면 좋다"는 모양**과
-> 그렇게 하는 이유를 적어둡니다. 프로젝트 사정에 맞게 고쳐 쓰세요.
+> **기준: 비용을 아끼는 EC2 한 대 + pm2.** 이 문서의 절차는 그 가정으로 썼습니다. 사람이 ssh 로
+> 들어가 `git pull` → `pnpm install` → 마이그레이션 → 빌드 → `pm2` 재기동을 합니다.
+> **컨테이너로 간다면 GitHub Actions(CI/CD)를 권합니다** — 맨 아래 [컨테이너로 간다면](#컨테이너로-간다면--github-actions) 절.
 >
-> 마이그레이션 쪽만은 실제로 들어 있습니다(`pnpm migrate:*`). 그것 없이는 배포 환경에
-> 스키마를 올릴 방법 자체가 없기 때문입니다.
+> 배포 스크립트(`deploy.sh` · workflow 파일 · Dockerfile)는 넣지 않았습니다. 인프라마다 달라서
+> **"이렇게 하면 좋다"는 모양**과 이유만 적습니다. 마이그레이션 쪽만은 실제로 들어 있습니다
+> (`pnpm migrate:*`). 그것 없이는 배포 환경에 스키마를 올릴 방법 자체가 없기 때문입니다.
 
 ---
 
-## 한 사이클
+## 한 사이클 (EC2 + pm2)
 
 ```
 로컬                              서버 (ssh 접속 후)
 ─────                             ──────────────────
 코드 변경                          git pull            어느 커밋을 올릴지는 사람이 정한다
-migration:generate                 migrate:show:dev    무엇이 적용될지 먼저 본다
-migration:lint      ← 작성 가드     migrate:run:dev     환경명을 입력하고 적용
-커밋 · 푸시                        (빌드 · 재기동)      프로젝트가 정하는 부분
+migration:generate                 pnpm install        devDependencies 까지 (아래 "서버에 필요한 것")
+migration:lint      ← 작성 가드     migrate:show:dev    무엇이 적용될지 먼저 본다
+커밋 · 푸시                        migrate:run:dev     환경명을 입력하고 적용
+                                   pnpm build
+                                   pm2 restart <앱>     ecosystem 파일은 아래 "서버에 필요한 것"
 ```
 
 **순서는 마이그레이션이 먼저, 배포가 나중입니다.** 새 마이그레이션 파일이 서버에 있어야 하니
@@ -29,9 +32,9 @@ migration:lint      ← 작성 가드     migrate:run:dev     환경명을 입�
 
 ---
 
-## 왜 마이그레이션을 배포에 넣지 않나
+## 왜 마이그레이션을 사람이 따로 돌리나 (EC2 + pm2)
 
-배포 스크립트가 마이그레이션을 자동으로 돌리면 **스키마 변경이 아무도 안 본 채로 나갑니다.**
+배포 스크립트가 마이그레이션을 아무 확인 없이 돌리면 **스키마 변경이 아무도 안 본 채로 나갑니다.**
 
 코드는 잘못 나가도 되돌리면 그만이지만, 스키마는 그렇지 않습니다. 컬럼을 지웠다가 되돌리면
 컬럼은 돌아와도 **그 안에 있던 값은 돌아오지 않습니다.** 파티션이나 컬럼 rename 이 섞이면
@@ -45,6 +48,28 @@ migration:lint      ← 작성 가드     migrate:run:dev     환경명을 입�
 3. 적용한 뒤 결과를 다시 보여줍니다
 
 `revert` 는 한 단계 더 요구합니다 — `revert-prod` 를 통째로 입력해야 합니다.
+
+확인 입력이 있어서 **TTY 가 없으면 거부합니다.** `ssh host 'pnpm migrate:run:dev'` 처럼 한 줄로
+보내면 입력 확인이 무력해지므로, 접속한 셸에서 직접 칩니다.
+
+> 컨테이너 · CI 경로에서는 마이그레이션을 파이프라인 단계로 넣어도 됩니다. 그때는 이 확인
+> 절차를 **선행 테스트와 승인 게이트**가 대신합니다 — [컨테이너로 간다면](#컨테이너로-간다면--github-actions).
+
+---
+
+## 스키마를 바꿀 때 — 추가 먼저, 삭제는 다음 배포
+
+순서가 "마이그레이션 → 배포" 이므로, 그 사이에는 **구버전 앱이 새 스키마 위에서 돕니다.**
+재기동이 몇 초라도, 무중단 배포라면 더 길게.
+
+| 변경                                              | 한 번에 해도 되나                       | 나눠서                                                                        |
+| ------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------- |
+| 컬럼 · 테이블 추가 (nullable 이거나 DEFAULT 있음) | 된다                                    | —                                                                             |
+| `NOT NULL` 컬럼 추가                              | DEFAULT 가 있으면 된다                  | 없으면 nullable 로 추가 → 채우기 → `SET NOT NULL`                             |
+| 컬럼 삭제                                         | **안 된다** — 구버전이 그 컬럼을 읽는다 | 1차: 코드에서 안 쓰게 배포 → 2차: 컬럼 삭제                                   |
+| 컬럼 이름 변경                                    | **안 된다**                             | 1차: 새 컬럼 추가 · 양쪽에 쓰기 → 2차: 읽기를 새 컬럼으로 → 3차: 옛 컬럼 삭제 |
+
+규칙은 하나입니다 — **이번 마이그레이션이 지금 돌고 있는 앱을 깨지 않는가.**
 
 ---
 
@@ -87,8 +112,39 @@ node          .mise.toml 이나 .nvmrc 로 버전을 고정하기를 권합니�
                 ssh 로 직접 칠 때는 되는데 CI 나 cron 에서는 안 되는 함정입니다.
 저장소 클론    환경마다 따로 두기를 권합니다. 한 디렉터리를 여러 환경이 쓰면
               dev 배포가 운영이 볼 빌드 결과를 덮습니다.
+pnpm install  devDependencies 까지 설치합니다 (--prod 금지).
+              migrate:* 는 빌드 결과가 아니라 ts-node 로 src/ 의 TS 를 직접 돌리고,
+              ts-node · tsconfig-paths 가 devDependencies 입니다. 서버에서 빌드한다면
+              nest CLI 도 마찬가지입니다.
 envs/.env.<env>   cp envs/.env.dev.example envs/.env.dev 후 값을 채웁니다.
-프로세스 관리자   pm2 · systemd 등. 보일러는 정하지 않습니다.
+              local 이 아니면 SWAGGER_USER · SWAGGER_PASSWORD 가 없을 때 부팅을 거부합니다.
+pm2           ★ NODE_ENV=dev|prod 를 여기서 넣습니다. start:prod 스크립트는 넣지 않고,
+                없으면 envs/.env.local 을 찾다가 env 검증(Joi)에서 부팅이 실패합니다.
+              ★ 작업 디렉터리는 저장소 루트입니다. env 파일 경로가 상대 경로입니다.
+메모리         1 GB 급 인스턴스에서는 pnpm install · nest build 중 메모리가 빠듯할 수 있습니다.
+              swap 을 잡아두거나, 빌드를 CI 로 옮깁니다.
+```
+
+pm2 설정은 서버의 저장소 루트에 둡니다(서버마다 값이 달라 저장소에 넣지 않습니다).
+
+```js
+// ecosystem.config.js
+module.exports = {
+  apps: [
+    {
+      name: "nest-boiler",
+      script: "dist/src/main.js", // start:prod 와 같은 진입점
+      cwd: __dirname, // 저장소 루트 — envs/ 상대 경로가 여기서 풀린다
+      env: { NODE_ENV: "prod", TZ: "Asia/Seoul" },
+    },
+  ],
+};
+```
+
+```bash
+pm2 start ecosystem.config.js   # 처음 한 번
+pm2 restart nest-boiler         # 배포마다 (빌드 뒤)
+pm2 save && pm2 startup         # 재부팅 후 자동 기동
 ```
 
 ---
@@ -116,6 +172,21 @@ envs/.env.<env>   cp envs/.env.dev.example envs/.env.dev 후 값을 채웁니다
 
 ---
 
+## 환경을 더 만들 때 (staging 등)
+
+지금은 `dev` · `prod` 만 받습니다. 그 외 이름은 `_db-env.sh` 가 거부합니다. `stg` 를 더하려면:
+
+```
+package.json                     migrate:show:stg · migrate:run:stg · migrate:revert:stg
+scripts/_db-env.sh               case 의 "dev | prod" 에 stg 추가 — 이 파일에서 고치는 유일한 곳
+src/global/constants/            nodeEnvs 에 stg 추가 (env 검증의 허용 값도 여기서 나온다)
+  common.constants.ts
+envs/env.ts                      NODE_ENV=stg → envs/.env.stg
+envs/.env.stg.example            템플릿
+```
+
+---
+
 ## 배포 스크립트를 만든다면
 
 보일러에는 없지만, 만든다면 이런 것들을 확인하게 하기를 권합니다.
@@ -128,18 +199,61 @@ node 버전이 맞는가          같은 서버에 다른 프로젝트가 있으
 기동 로그에 환경·DB 가 맞나  뜬 뒤 눈으로 한 번 더 확인
 ```
 
-**자동 배포(CI)를 붙일 때도 마이그레이션은 사람이 돌립니다.** 부팅 가드가 순서를 강제하므로,
-마이그레이션을 잊은 자동 배포는 조용히 성공하지 않고 그 자리에서 실패합니다. CI 쪽에
-마이그레이션 단계를 따로 만들 필요가 없습니다.
+EC2 + pm2 경로에 자동 배포를 붙여도 **부팅 가드가 순서를 강제합니다.** 마이그레이션을 잊은
+배포는 조용히 성공하지 않고 그 자리에서 실패합니다. 컨테이너로 가면서 마이그레이션까지 파이프라인에
+넣는다면 아래 절을 따릅니다.
+
+---
+
+## 컨테이너로 간다면 — GitHub Actions
+
+이미지를 CI 에서 빌드하면 작은 EC2 가 빌드 메모리를 감당할 필요도 없어집니다.
+
+```
+PR · push     테스트       빈 Postgres(서비스 컨테이너)에 마이그레이션 선행 테스트 → e2e
+main 머지     빌드         이미지 빌드 → 레지스트리 푸시 (GHCR · ECR)
+배포 (승인)   마이그레이션  대상 DB 에 적용 — 또는 사람이 EC2 경로처럼 적용
+              배포         EC2 에서 docker pull → 새 컨테이너 기동 확인 → 옛 컨테이너 종료
+```
+
+**마이그레이션 선행 테스트** — 배포 전에 마이그레이션이 깨지지 않았는지 기계가 봅니다.
+
+```bash
+NODE_ENV=test pnpm run typeorm migration:run                                   # 빈 DB 에 처음부터 전부
+NODE_ENV=test pnpm run typeorm migration:generate src/database/migrations/Check --check
+                                                                               # 엔티티와 어긋나면 종료 코드 1
+```
+
+- 접속 정보는 job 의 env 로 줍니다. dotenv 는 이미 있는 값을 덮지 않으므로 `envs/.env.test` 보다 우선합니다.
+- `--check` 는 파일을 만들지 않고, 엔티티를 바꾸고 마이그레이션을 빠뜨린 커밋을 잡습니다.
+- e2e 는 마이그레이션이 아니라 `synchronize` 로 DB 를 만들므로, 이 단계가 따로 있어야 합니다.
+
+**마이그레이션 적용을 파이프라인에 넣을 때**
+
+- `migrate.sh` 는 TTY 가 없으면 거부합니다. 파이프라인은 `NODE_ENV=prod pnpm run typeorm migration:run`
+  을 직접 부릅니다. 그러면 접속 대상 표시와 `EXPECTED_DB_NAME` 검사가 빠지므로, **GitHub
+  Environments 의 승인(required reviewers)** 으로 사람 확인을 대신합니다. prod 는 반드시 겁니다.
+- 이 명령은 `ts-node` 로 `src/` 를 돌립니다. **소스와 devDependencies 가 있는 곳**(CI 러너, 또는
+  마이그레이션용 이미지)에서 돌고, `dist/` 와 prod 의존성만 담은 앱 이미지에서는 돌지 않습니다.
+- DB 가 사설망이면 GitHub 호스트 러너는 닿지 않습니다. EC2(같은 VPC)에 self-hosted runner 를 두거나,
+  마이그레이션용 이미지를 EC2 에서 한 번 실행합니다.
+- 순서는 그대로 **마이그레이션 → 배포**이고, "추가 먼저, 삭제는 다음 배포" 도 그대로입니다.
+
+**컨테이너 실행**
+
+- env 는 파일 대신 환경 변수로 줘도 됩니다(dotenv 가 덮지 않습니다). `NODE_ENV` · `TZ` 는 반드시 넣습니다.
+- 서버가 한 대라, 새 컨테이너가 부팅을 거부하면(미적용 마이그레이션 · env 누락) 그동안 서비스가
+  내려갑니다. **옛 컨테이너는 새 컨테이너가 뜬 것을 확인한 뒤 내립니다.**
+- 되돌리기는 이전 이미지 태그로 다시 띄우는 것입니다.
 
 ---
 
 ## 되돌릴 때
 
-| | 비용 | |
-|---|---|---|
-| 앱만 되돌리기 | 싸다 | 이전 빌드로 재기동. 대부분 여기서 끝납니다 |
-| 스키마 되돌리기 | 비싸다 | `migrate:revert:<env>` — 마지막 수단입니다 |
+|                 | 비용   |                                                                         |
+| --------------- | ------ | ----------------------------------------------------------------------- |
+| 앱만 되돌리기   | 싸다   | 이전 빌드(컨테이너면 이전 이미지 태그)로 재기동. 대부분 여기서 끝납니다 |
+| 스키마 되돌리기 | 비싸다 | `migrate:revert:<env>` — 마지막 수단입니다                              |
 
 **둘을 같은 무게로 두지 마세요.** 사고 대부분은 앱만 되돌리면 해결됩니다. 스키마 revert 는
 데이터가 함께 사라질 수 있습니다.
@@ -148,7 +262,9 @@ node 버전이 맞는가          같은 서버에 다른 프로젝트가 있으
 
 ## 처음 배포하기 전 체크리스트
 
-- [ ] `envs/.env.<env>` 를 서버에 두고 값을 채웠다
+- [ ] `envs/.env.<env>` 를 서버에 두고 값을 채웠다 (`SWAGGER_USER` · `SWAGGER_PASSWORD` 포함)
+- [ ] 서버에서 `pnpm install` 을 devDependencies 까지 했다
+- [ ] pm2 ecosystem 에 `NODE_ENV` 와 작업 디렉터리(저장소 루트)를 넣었고, `pm2 save && pm2 startup` 을 했다
 - [ ] `EXPECTED_DB_NAME` 을 채웠다 (또는 환경마다 DB 가 분리돼 있어 비워도 된다고 판단했다)
 - [ ] `pnpm migrate:show:<env>` 로 **읽기만** 해보고 접속 대상이 맞는지 눈으로 봤다
 - [ ] 로컬에서 `pnpm migration:lint` 를 돌려 파괴적 구문이 없는지 확인했다

@@ -65,9 +65,19 @@ pnpm migrate:revert:dev   # revert the last one (type `revert-dev`)
 - `scripts/_db-env.sh` resolves `envs/.env.<env>`, prints the target, and refuses on a missing file.
   Set `EXPECTED_DB_NAME` in that env file to also cross-check `DB_NAME` — it catches a prod config
   copied into `.env.dev`. Leave it blank to skip the check.
-- Migration is deliberately **not** part of deploy: schema changes are expensive to undo, so a human
-  confirms them. Order is always migrate first, deploy second — the boot guard
-  (`assertNoPendingMigrations`) refuses to start the app if you get it backwards.
+- `DEPLOY.md` is written for **one cheap EC2 instance + pm2**: a human runs the migration over ssh,
+  separately from the deploy, because schema changes are expensive to undo. Order is always migrate
+  first, deploy second — the boot guard (`assertNoPendingMigrations`) refuses to start the app if you
+  get it backwards.
+- **Containers → GitHub Actions.** There the pipeline may run migrations as a step: a pre-test on an
+  empty Postgres (`migration:run`, then `migration:generate <path> --check`), and applying behind a
+  GitHub Environments approval. `migrate.sh` needs a TTY, so the pipeline calls
+  `pnpm run typeorm migration:run` directly, from a place that has `src/` and devDependencies.
+- Migrate-then-deploy means the old app runs on the new schema for a moment, so a migration must not
+  break the running app: add first, and drop or rename a column in a later deploy (table in `DEPLOY.md`).
+- The server needs devDependencies (`migrate:*` runs `ts-node` on `src/`, not `dist/`), `NODE_ENV` set by
+  the process manager (`start:prod` does not set it; without it the env validation fails), and the repo
+  root as working directory. Only `dev` and `prod` exist; `DEPLOY.md` lists what a new env touches.
 - No tunnel script ships here, but there is a seam for one. If reaching the DB needs infra-specific
   setup (ssh tunnel, Cloud SQL Proxy, RDS IAM token), create `scripts/db-connect.sh` — `_db-env.sh`
   sources it after reading the env file, and anything you `export` there wins over the env values.
@@ -130,7 +140,8 @@ src/
                    # factory registration), entities/ (core-hard/core-soft base)
 
 scripts/           # db-up/down/reset.sh, migration-lint.sh, migrate.sh, _db-env.sh,
-                   # db-connect.sh.example (per-project DB reachability — tunnel/proxy/IAM)
+                   # db-connect.sh.example (per-project DB reachability — tunnel/proxy/IAM),
+                   # postgres/init-extra-dbs.sh (creates the extra DB on the container's first boot)
 envs/              # env.ts (NODE_ENV -> file), .env.*.example (committed; .env.* are ignored)
 ```
 
