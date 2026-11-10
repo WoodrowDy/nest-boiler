@@ -465,6 +465,13 @@ catch sites above rely on:
 
 - Success responses are wrapped by `ObjectResponse` (`{ row, meta }`) / `ListResponse`
   (`{ rows, count, meta }`). `meta = { traceId, timestamp }`.
+- **A write answers with its status code.** POST returns the saved resource
+  (`ObjectResponse<XSaveResponse>`); PATCH, DELETE and business actions return no body — 200 means it
+  happened, 404 / 409 say why not, and the client refetches what it needs. Their traceId is in the
+  `X-Request-Id` header.
+  - **Never return TypeORM's `InsertResult` / `UpdateResult` / `DeleteResult`.** `raw` is shaped by the
+    driver (on Postgres an INSERT's `raw` is the `RETURNING` rows), so it breaks the closed default, and
+    the API contract would change with the ORM.
 - **traceId**: `TraceIdMiddleware` assigns one per request (uses incoming `X-Request-Id` or a UUID),
   stores it in `AsyncLocalStorage` (`global/context/request-context.ts`), and returns it as the
   `X-Request-Id` response header.

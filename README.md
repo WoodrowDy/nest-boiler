@@ -199,6 +199,9 @@ async createUser(payload: PostUserPayload, transactionManager?: EntityManager): 
 ### 응답 · 관측
 
 - 성공 응답은 `ObjectResponse`(`{ row, meta }`) · `ListResponse`(`{ rows, count, meta }`) 로 감쌉니다.
+- **쓰기는 상태 코드로 답합니다.** POST 는 저장된 리소스(`XSaveResponse`)를 돌려주고, PATCH · DELETE · 업무 액션은
+  본문이 없습니다 — 200 이면 성공, 404 · 409 가 실패 이유이고, 필요한 값은 클라이언트가 다시 조회합니다.
+  traceId 는 응답 헤더 `X-Request-Id` 에 있습니다. TypeORM 의 `UpdateResult` 같은 결과는 내보내지 않습니다.
 - **traceId**: `TraceIdMiddleware` 가 요청마다 부여합니다(들어온 `X-Request-Id` 우선, 없으면 UUID).
   `AsyncLocalStorage` 에 담아 모든 로그 줄에 붙이고, 응답 헤더 `X-Request-Id` 로 돌려줍니다.
 - **로그**: winston. 접근 로그는 `RequestLoggerMiddleware`(`HTTP REQ`) 와
