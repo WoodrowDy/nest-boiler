@@ -302,7 +302,6 @@ GitHub Actions(CI/CD)를 권하고, 그 경로도 같은 문서에 있습니다.
 
 - **인증 가드가 없습니다.** `JwtMiddleware` 는 유효한 `Bearer` 토큰이면 `req.session` 을 붙이고,
   잘못된 토큰이면 403 입니다. **토큰이 없으면 그냥 통과합니다** — 막아야 하는 API 가 생기면 가드부터 붙입니다.
-- **`strictNullChecks` 가 꺼져 있습니다.**
 - **DB 쿼리 로그가 꺼져 있습니다**(`logging: false` 고정). `DB_LOGGING` · `DB_MAX_QUERY_EXECUTION` ·
   `USE_LOCAL_HTTPS_OPTIONS` 는 검증만 하고 읽는 곳이 없습니다. 5xx 는 전역 필터가 로그에 남깁니다.
 - **`@ApiDoc` 표준 에러에 409 가 없습니다.**

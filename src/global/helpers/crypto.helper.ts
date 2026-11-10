@@ -1,6 +1,7 @@
 import * as bcrypt from "bcryptjs";
 import { pbkdf2Sync, createCipheriv, createDecipheriv, createHash, createHmac } from "node:crypto";
 import * as CryptoJS from "crypto-js";
+import { requireEnv } from "./env.helper";
 
 export const bcryptHash = async function (string: string): Promise<string> {
   const salt = await bcrypt.genSalt();
@@ -19,10 +20,10 @@ export const bcryptCompare = async function (
 export const singleSaltHash = function (string: string): string {
   const hashedString = pbkdf2Sync(
     string,
-    process.env.SALT,
-    Number.parseInt(process.env.ITERATIONS),
-    Number.parseInt(process.env.KEYLEN),
-    process.env.DIGEST
+    requireEnv("SALT"),
+    Number.parseInt(requireEnv("ITERATIONS"), 10),
+    Number.parseInt(requireEnv("KEYLEN"), 10),
+    requireEnv("DIGEST")
   ).toString("base64");
 
   return hashedString;

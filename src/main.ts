@@ -11,6 +11,7 @@ import basicAuth from "express-basic-auth";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { WINSTON_MODULE_NEST_PROVIDER } from "nest-winston";
 import { assertNoPendingMigrations } from "./global/helpers/pending-migrations.helper";
+import { requireEnv } from "./global/helpers/env.helper";
 
 async function bootstrap() {
   // 스키마가 코드보다 뒤쳐진 채로 뜨지 않게 한다. 앱을 만들기 전에 본다.
@@ -19,7 +20,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   // Nest 기본 로거를 winston 으로 교체 (로그에 traceId 자동 부착)
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
-  const port = Number.parseInt(process.env.PORT, 10);
+  const port = Number.parseInt(requireEnv("PORT"), 10);
   const env = process.env.NODE_ENV;
   const timezone = process.env.TZ;
 

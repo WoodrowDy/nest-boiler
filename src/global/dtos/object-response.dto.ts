@@ -10,7 +10,7 @@ export class ObjectResponse<T> {
   }
 
   row: T;
-  responseCode: string;
+  responseCode?: string;
   extras?: any;
   meta: ResponseMeta;
 }

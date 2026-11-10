@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 /**
  * DTO 정의 시 @Transform decorator에서 사용하는 함수(@IsDate decorator와 함께 사용)
  */
-export const transformStringToDate = function (stringDate: string): Date {
+export const transformStringToDate = function (stringDate: string): Date | null {
   if (stringDate) {
     const date = new Date(stringDate);
 
@@ -16,7 +16,7 @@ export const transformStringToDate = function (stringDate: string): Date {
 /**
  * DTO 정의 시 @Transform decorator에서 사용하는 함수(@IsDate decorator와 함께 사용)
  */
-export const transformStringToDateStart = function (stringDate: string): Date {
+export const transformStringToDateStart = function (stringDate: string): Date | null {
   if (stringDate) {
     const date = new Date(stringDate);
     const dateStart = dayjs(date).startOf("day").toDate();
@@ -30,7 +30,7 @@ export const transformStringToDateStart = function (stringDate: string): Date {
 /**
  * DTO 정의 시 @Transform decorator에서 사용하는 함수(@IsDate decorator와 함께 사용)
  */
-export const transformStringToDateEnd = function (stringDate: string): Date {
+export const transformStringToDateEnd = function (stringDate: string): Date | null {
   if (stringDate) {
     const date = new Date(stringDate);
     const dateEnd = dayjs(date).endOf("day").toDate();

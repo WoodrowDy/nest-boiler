@@ -46,7 +46,7 @@ export const ApiDoc = (options: ApiDocOptions) => {
     withStandardErrors = true,
   } = options;
 
-  const decorators = [];
+  const decorators: Parameters<typeof applyDecorators> = [];
   const hasObjectResponseModel = responseModel && !isArrayResponse;
   const hasListRepsonseModel = responseModel && isArrayResponse;
   const shouldAddModelSchema = responseModel;

@@ -512,6 +512,11 @@ catch sites above rely on:
 - Environments: `local | dev | prod | test`, files in `envs/` selected by `NODE_ENV` (`envs/env.ts`).
   `.env.local` / `.env.dev` / `.env.prod` / `.env.docker` are git-ignored; `.env.test` (e2e) and the
   `.env.*.example` templates are committed. `app.module.ts` validates the env with Joi at boot.
+- **`strictNullChecks` is on.** A value that can be missing says so in its type (`Date | null`,
+  `responseCode?`); a value that must exist is read with `requireEnv("KEY")`
+  (`global/helpers/env.helper.ts`), which throws with the key's name instead of handing on `undefined`
+  or `NaN` — it also covers `typeorm.config.ts`, which the migration CLI loads without Nest's Joi
+  validation. Do not silence the checker with `!`.
 
 ---
 
@@ -530,8 +535,6 @@ What the boilerplate does not do yet. Check this list before treating a behaviou
 - **No auth guard.** `JwtMiddleware` runs on every route: a valid `Bearer` token attaches
   `req.session`, an invalid one is 403, and no token passes straight through. Nothing blocks an
   unauthenticated request — add a guard before exposing anything that needs a user.
-- **`strictNullChecks` is off.** Turning it on (and fixing what it reports) is planned as its own
-  change, so the before/after can be compared.
 - **DB query logging is off, and three env keys do nothing.** `typeorm.config.ts` hardcodes
   `logging: false`; `DB_LOGGING`, `DB_MAX_QUERY_EXECUTION` and `USE_LOCAL_HTTPS_OPTIONS` are validated
   but never read; `CustomDbLogger` exists but is not wired. 5xx are still logged by the filter.

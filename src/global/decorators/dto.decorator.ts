@@ -51,7 +51,7 @@ interface ObjectValidationConfig extends DefaultValidationConfig {
 type BooleanValidationConfig = DefaultValidationConfig;
 
 export const IsCustomString = function (config: StringValidationConfig) {
-  const decorators = [];
+  const decorators: Parameters<typeof applyDecorators> = [];
 
   if (config.required === false) decorators.push(IsOptional());
   else if (config.required === true) decorators.push(IsNotEmpty());
@@ -66,7 +66,7 @@ export const IsCustomString = function (config: StringValidationConfig) {
 };
 
 export const IsCustomNumber = function (config: NumberValidationConfig) {
-  const decorators = [];
+  const decorators: Parameters<typeof applyDecorators> = [];
 
   if (config.required === false) decorators.push(IsOptional());
   else if (config.required === true) decorators.push(IsNotEmpty());
@@ -85,7 +85,7 @@ export const IsCustomNumber = function (config: NumberValidationConfig) {
 };
 
 export const IsCustomEnum = function (config: EnumValidationConfig) {
-  const decorators = [];
+  const decorators: Parameters<typeof applyDecorators> = [];
 
   if (config.required === false) decorators.push(IsOptional());
   else if (config.required === true) decorators.push(IsNotEmpty());
@@ -126,7 +126,7 @@ export const IsCustomBoolean = function (config: BooleanValidationConfig) {
 type EmailValidationConfig = DefaultValidationConfig;
 
 export const IsCustomEmail = function (config: EmailValidationConfig) {
-  const decorators = [];
+  const decorators: Parameters<typeof applyDecorators> = [];
 
   if (config.required === false) decorators.push(IsOptional());
   else if (config.required === true) decorators.push(IsNotEmpty());
@@ -137,7 +137,7 @@ export const IsCustomEmail = function (config: EmailValidationConfig) {
 };
 
 export const IsCustomMatches = function (config: MatchesValidationConfig) {
-  const decorators = [];
+  const decorators: Parameters<typeof applyDecorators> = [];
 
   if (config.required === false) decorators.push(IsOptional());
   else if (config.required === true) decorators.push(IsNotEmpty());
@@ -154,7 +154,7 @@ export const IsCustomMatches = function (config: MatchesValidationConfig) {
 type DateValidationConfig = DefaultValidationConfig;
 
 export const IsCustomDate = function (config: DateValidationConfig) {
-  const decorators = [];
+  const decorators: Parameters<typeof applyDecorators> = [];
 
   if (config.required === false) decorators.push(IsOptional());
   else if (config.required === true) decorators.push(IsNotEmpty());
@@ -165,7 +165,7 @@ export const IsCustomDate = function (config: DateValidationConfig) {
 };
 
 export const IsCustomObject = function (config: ObjectValidationConfig) {
-  const decorators = [];
+  const decorators: Parameters<typeof applyDecorators> = [];
 
   if (config.required === false) decorators.push(IsOptional());
   else if (config.required === true) decorators.push(IsNotEmpty());

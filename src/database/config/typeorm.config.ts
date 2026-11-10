@@ -3,13 +3,14 @@ import { config } from "dotenv";
 import envFilePath from "envs/env";
 import * as path from "node:path";
 import { SeederOptions } from "typeorm-extension";
+import { requireEnv } from "src/global/helpers/env.helper";
 
 config({ path: envFilePath });
 
 export const dataSourceOptions: DataSourceOptions = {
   type: "postgres",
   host: process.env.DB_HOST,
-  port: Number.parseInt(process.env.DB_PORT),
+  port: Number.parseInt(requireEnv("DB_PORT"), 10),
   database: process.env.DB_NAME,
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,

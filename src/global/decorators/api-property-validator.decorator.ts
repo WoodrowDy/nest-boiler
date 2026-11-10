@@ -68,7 +68,7 @@ export const ApiPropertyValidator = (options: ApiPropertyValidatorOption) => {
 
   isArray = isArray === true || isArray === false ? isArray : false;
 
-  const decorators = [];
+  const decorators: Parameters<typeof applyDecorators> = [];
 
   if (isArray) {
     decorators.push(IsCustomArray(options));
@@ -172,7 +172,7 @@ function IsCustomString(config: ApiPropertyValidatorOption) {
         message: (args: ValidationArguments) =>
           `${config.name || args.property}은(는) 문자 타입이어야합니다.`,
       })(object, propertyName);
-      Length(config.minLength, config.maxLength, {
+      Length(config.minLength ?? 0, config.maxLength, {
         each: config.isArray,
         message: (args: ValidationArguments) =>
           `${config.name || args.property}의최소길이는 ${
@@ -184,7 +184,7 @@ function IsCustomString(config: ApiPropertyValidatorOption) {
         message: (args: ValidationArguments) =>
           `${config.name || args.property}은(는) 문자 타입이어야합니다.`,
       })(object, propertyName);
-      Length(config.minLength, config.maxLength, {
+      Length(config.minLength ?? 0, config.maxLength, {
         message: (args: ValidationArguments) =>
           `${config.name || args.property}의 최소길이는 ${
             config.minLength
@@ -194,6 +194,7 @@ function IsCustomString(config: ApiPropertyValidatorOption) {
   };
 }
 
+/** ★ Min · Max 는 값이 있을 때만 건다. Min(undefined) 는 class-validator 에서 항상 실패한다. */
 function IsCustomNumber(config: ApiPropertyValidatorOption) {
   return function (object: Record<string, unknown>, propertyName: string) {
     if (config.isArray) {
@@ -202,36 +203,45 @@ function IsCustomNumber(config: ApiPropertyValidatorOption) {
         message: (args: ValidationArguments) =>
           `${config.name || args.property}은(는) 숫자 타입입니다.`,
       })(object, propertyName);
-      Min(config.minimum, {
-        each: config.isArray,
-        message: (args: ValidationArguments) =>
-          `${config.name || args.property}의 최솟값은 ${config.minimum}입니다.`,
-      })(object, propertyName);
-      Max(config.maximum, {
-        each: config.isArray,
-        message: (args: ValidationArguments) =>
-          `${config.name || args.property}의 최댓값은 ${config.maximum}입니다.`,
-      })(object, propertyName);
+      if (config.minimum !== undefined) {
+        Min(config.minimum, {
+          each: config.isArray,
+          message: (args: ValidationArguments) =>
+            `${config.name || args.property}의 최솟값은 ${config.minimum}입니다.`,
+        })(object, propertyName);
+      }
+      if (config.maximum !== undefined) {
+        Max(config.maximum, {
+          each: config.isArray,
+          message: (args: ValidationArguments) =>
+            `${config.name || args.property}의 최댓값은 ${config.maximum}입니다.`,
+        })(object, propertyName);
+      }
     } else {
       IsNumber(undefined, {
         each: config.isArray,
         message: (args: ValidationArguments) =>
           `${config.name || args.property}은(는) 숫자 타입입니다.`,
       })(object, propertyName);
-      Min(config.minimum, {
-        message: (args: ValidationArguments) =>
-          `${config.name || args.property}의 최솟값은 ${config.minimum}입니다.`,
-      })(object, propertyName);
-      Max(config.maximum, {
-        message: (args: ValidationArguments) =>
-          `${config.name || args.property}의 최댓값은 ${config.maximum}입니다.`,
-      })(object, propertyName);
+      if (config.minimum !== undefined) {
+        Min(config.minimum, {
+          message: (args: ValidationArguments) =>
+            `${config.name || args.property}의 최솟값은 ${config.minimum}입니다.`,
+        })(object, propertyName);
+      }
+      if (config.maximum !== undefined) {
+        Max(config.maximum, {
+          message: (args: ValidationArguments) =>
+            `${config.name || args.property}의 최댓값은 ${config.maximum}입니다.`,
+        })(object, propertyName);
+      }
     }
   };
 }
 
 function IsCustomEnum(config: ApiPropertyValidatorOption) {
   return function (object: Record<string, unknown>, propertyName) {
+    if (config.enum === undefined) return; // 호출부가 enum 이 있을 때만 부른다 — 타입에 알린다
     IsEnum(config.enum, {
       each: config.isArray,
       message: (args: ValidationArguments) =>

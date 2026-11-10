@@ -21,6 +21,7 @@ import { TraceIdMiddleware } from "./global/middlewares/trace-id.middleware";
 import { RequestLoggerMiddleware } from "./global/middlewares/request-logger.middleware";
 import { WinstonModule } from "nest-winston";
 import { winstonConfig } from "./global/logger/winston.config";
+import { requireEnv } from "./global/helpers/env.helper";
 import { JwtModule } from "./domain/jwt/jwt.module";
 import { UsersModule } from "./domain/template/users/users.module";
 import { BoardsModule } from "./domain/template/boards/boards.module";
@@ -56,6 +57,7 @@ import { BoardsModule } from "./domain/template/boards/boards.module";
         DB_MAX_QUERY_EXECUTION: Joi.number(),
         USE_LOCAL_HTTPS_OPTIONS: Joi.boolean(),
 
+        PORT: Joi.number().port().required(),
         JWT_SECRET: Joi.string().required(),
 
         EXPECTED_DB_NAME: Joi.string().allow(""), // migrate.sh 용. 비우면 검사하지 않는다
@@ -78,7 +80,7 @@ import { BoardsModule } from "./domain/template/boards/boards.module";
       retryDelay: 1000,
     }),
     JwtModule.forRoot({
-      jwtSecret: process.env.JWT_SECRET,
+      jwtSecret: requireEnv("JWT_SECRET"),
     }),
     //Templates — 복사해서 쓰는 예시 도메인.
     UsersModule,

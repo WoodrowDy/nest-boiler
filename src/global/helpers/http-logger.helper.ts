@@ -136,7 +136,7 @@ export const responseLoggerHelper = function (
 };
 
 export const userAgentParser = function (req: Request): CommonParsedUserAgentDto {
-  const userAgent = req.headers["user-agent"];
+  const userAgent = req.headers["user-agent"] ?? ""; // 헤더가 없는 요청(curl · 헬스체크)도 있다
   const parsedUserAgent = parser(userAgent);
   const mobileDetect = new MobileDetect(userAgent);
 
