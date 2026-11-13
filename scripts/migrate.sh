@@ -21,10 +21,22 @@ ACTION="${2:-run}"
 case "$ACTION" in
   run | show | revert) ;;
   *)
-    echo "사용법: pnpm migrate:{show|run|revert}:{dev|prod}"
+    echo "사용법: pnpm migrate:{show|run}:{dev|prod} · pnpm migrate:revert:dev"
     exit 1
     ;;
 esac
+
+# ★ prod 는 되돌리지 않는다. 고칠 게 있으면 새 마이그레이션으로 덮는다 (roll forward).
+#   실패한 적용은 알아서 되돌아간다 — TypeORM 은 미적용분 전체를 한 트랜잭션으로 돌리고
+#   (기본값 "all"), Postgres 는 DDL 도 트랜잭션 안에서 롤백된다. 그러면 revert 가 필요한 경우는
+#   "성공했는데 틀린 것" 뿐이고, 그때 down() 은 보통 방금 추가한 컬럼을 그 안의 값과 함께 지운다.
+#   down() 을 실데이터로 돌려본 적도 없다.
+if [ "$ENV" = "prod" ] && [ "$ACTION" = "revert" ]; then
+  echo "✗ prod 는 revert 하지 않습니다."
+  echo "  고칠 내용을 새 마이그레이션으로 만들어 적용하세요 (roll forward):"
+  echo "  pnpm migration:generate <이름>  →  커밋  →  서버에서 pnpm migrate:run:prod"
+  exit 1
+fi
 
 cd "$(dirname "$0")/.."
 

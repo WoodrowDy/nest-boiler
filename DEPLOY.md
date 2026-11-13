@@ -16,7 +16,7 @@
 로컬                              서버 (ssh 접속 후)
 ─────                             ──────────────────
 코드 변경                          git pull            어느 커밋을 올릴지는 사람이 정한다
-migration:generate                 pnpm install        devDependencies 까지 (아래 "서버에 필요한 것")
+migration:generate <이름>          pnpm install        devDependencies 까지 (아래 "서버에 필요한 것")
 migration:lint      ← 작성 가드     migrate:show:dev    무엇이 적용될지 먼저 본다
 커밋 · 푸시                        migrate:run:dev     환경명을 입력하고 적용
                                    pnpm build
@@ -47,7 +47,8 @@ migration:lint      ← 작성 가드     migrate:show:dev    무엇이 적용�
    치는 것을 막습니다)
 3. 적용한 뒤 결과를 다시 보여줍니다
 
-`revert` 는 한 단계 더 요구합니다 — `revert-prod` 를 통째로 입력해야 합니다.
+`revert` 는 **dev 에서만** 됩니다. 한 단계 더 요구합니다 — `revert-dev` 를 통째로 입력해야 합니다.
+**prod 는 되돌리지 않습니다**(아래 "되돌릴 때").
 
 확인 입력이 있어서 **TTY 가 없으면 거부합니다.** `ssh host 'pnpm migrate:run:dev'` 처럼 한 줄로
 보내면 입력 확인이 무력해지므로, 접속한 셸에서 직접 칩니다.
@@ -177,7 +178,7 @@ pm2 save && pm2 startup         # 재부팅 후 자동 기동
 지금은 `dev` · `prod` 만 받습니다. 그 외 이름은 `_db-env.sh` 가 거부합니다. `stg` 를 더하려면:
 
 ```
-package.json                     migrate:show:stg · migrate:run:stg · migrate:revert:stg
+package.json                     migrate:show:stg · migrate:run:stg · migrate:revert:stg (revert 를 열지는 여기서 정한다)
 scripts/_db-env.sh               case 의 "dev | prod" 에 stg 추가 — 이 파일에서 고치는 유일한 곳
 src/global/constants/            nodeEnvs 에 stg 추가 (env 검증의 허용 값도 여기서 나온다)
   common.constants.ts
@@ -253,10 +254,20 @@ NODE_ENV=test pnpm run typeorm migration:generate src/database/migrations/Check 
 |                 | 비용   |                                                                         |
 | --------------- | ------ | ----------------------------------------------------------------------- |
 | 앱만 되돌리기   | 싸다   | 이전 빌드(컨테이너면 이전 이미지 태그)로 재기동. 대부분 여기서 끝납니다 |
-| 스키마 되돌리기 | 비싸다 | `migrate:revert:<env>` — 마지막 수단입니다                              |
+| 스키마 바로잡기 | 비싸다 | 새 마이그레이션으로 덮는다(roll forward). revert 는 dev 에서만          |
 
-**둘을 같은 무게로 두지 마세요.** 사고 대부분은 앱만 되돌리면 해결됩니다. 스키마 revert 는
-데이터가 함께 사라질 수 있습니다.
+**둘을 같은 무게로 두지 마세요.** 사고 대부분은 앱만 되돌리면 해결됩니다.
+
+**prod 스키마는 되돌리지 않고 덮습니다.** 이미 적용된 파일을 고치는 게 아니라, 고치는 마이그레이션을
+그 위에 하나 더 쌓아 `migrate:run:prod` 로 적용합니다. `migrate:revert:prod` 는 없고
+`migrate.sh prod revert` 도 거부합니다.
+
+- **실패한 적용은 알아서 되돌아갑니다.** TypeORM 은 미적용분 전체를 한 트랜잭션으로 돌리고(기본값
+  `"all"`), Postgres 는 DDL 도 트랜잭션 안에서 롤백합니다. 반쯤 적용된 상태가 남지 않습니다.
+- 그래서 revert 가 필요한 경우는 **성공했는데 틀린 것** 뿐입니다. 그때 `down()` 은 보통 방금 추가한
+  컬럼을 그 안의 값과 함께 지웁니다. 실데이터로 돌려본 적도 없습니다.
+- 앱이 새 스키마를 못 견디면 먼저 **앱만** 되돌립니다. 추가 먼저 · 삭제는 다음 배포(위)를 지켰다면
+  구버전 앱은 새 스키마 위에서도 돕니다.
 
 ---
 
@@ -268,4 +279,4 @@ NODE_ENV=test pnpm run typeorm migration:generate src/database/migrations/Check 
 - [ ] `EXPECTED_DB_NAME` 을 채웠다 (또는 환경마다 DB 가 분리돼 있어 비워도 된다고 판단했다)
 - [ ] `pnpm migrate:show:<env>` 로 **읽기만** 해보고 접속 대상이 맞는지 눈으로 봤다
 - [ ] 로컬에서 `pnpm migration:lint` 를 돌려 파괴적 구문이 없는지 확인했다
-- [ ] 되돌리는 방법을 알고 있다
+- [ ] 되돌리는 방법을 알고 있다 (앱은 이전 빌드로, prod 스키마는 새 마이그레이션으로)

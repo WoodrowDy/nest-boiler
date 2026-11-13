@@ -26,8 +26,7 @@ pnpm run start:local                           # http://localhost:8080 · Swagge
 
 - **미적용 마이그레이션이 있으면 앱이 뜨지 않습니다.** 메시지에 환경·DB·실행할 명령이 나옵니다
   (`src/global/helpers/pending-migrations.helper.ts`).
-- `pnpm setup-db` 는 `migration:generate` 부터 돌립니다. 엔티티와 스키마가 어긋나 있으면 마이그레이션
-  파일이 새로 생기므로, 처음 받은 저장소에서는 위처럼 `migration:run` 만 씁니다.
+- 위의 `migration:run` + `seed:run` 은 `pnpm setup-db` 한 줄로도 됩니다.
 - `db:up` 이 `port is already allocated` 로 실패하면 `docker-compose.yml` 의 `POSTGRES_PORT`
   기본값과 `envs/.env.local` 의 `DB_PORT` 를 같이 바꿉니다.
 
@@ -56,7 +55,8 @@ test/
     fixtures/             # API 호출 함수
     mocks/                # 목 데이터
     scenarios/            # e2e 시나리오
-scripts/                  # db-up/down/reset, migration-lint, migrate(배포 환경), _db-env,
+scripts/                  # db-up/down/reset, migration-new(생성) · migration-lint(검사) ·
+                          # _migration-name(둘이 같이 읽는 이름 규칙), migrate(배포 환경), _db-env,
                           # db-connect.sh.example(터널 등 DB 접근 — 프로젝트가 복사해 씀),
                           # postgres/init-extra-dbs.sh(컨테이너 최초 기동 때 DB 생성)
 envs/                     # env.ts(NODE_ENV → 파일 선택), .env.*.example
@@ -237,20 +237,26 @@ pnpm run test:cov      # 커버리지
 
 ```bash
 # 로컬 — 모두 NODE_ENV=local 고정이라 envs/.env.local 만 봅니다
-pnpm migration:generate   # 엔티티 변경분으로 생성 (커밋 전 SQL 리뷰)
-pnpm migration:create     # 빈 마이그레이션 (데이터 이관 · 수동 SQL)
-pnpm migration:lint       # up() 의 되돌리기 어려운 구문 검사 (인자 없으면 스테이징된 것만, --all 전체)
+pnpm migration:generate <이름>   # 로컬 DB 를 먼저 최신으로 올린 뒤 엔티티 변경분으로 생성 (커밋 전 SQL 리뷰)
+pnpm migration:create <이름>     # 빈 마이그레이션 (데이터 이관 · 수동 SQL)
+pnpm migration:check      # 엔티티와 DB 가 같은지만 확인 — 파일을 만들지 않음 (차이 있으면 종료코드 1)
+pnpm migration:lint       # 파일 이름 + up() 의 되돌리기 어려운 구문 검사 (인자 없으면 스테이징된 것만, --all 전체)
 pnpm migration:show       # 적용 여부 목록
 pnpm migration:run        # 적용
 pnpm migration:revert     # 마지막 한 건 되돌리기
 pnpm seed:run             # MainSeeder 실행 (항상 local)
 
-# 배포 환경 — 서버에 ssh 로 들어가서 돌립니다 (dev 자리에 prod 도 됩니다)
+# 배포 환경 — 서버에 ssh 로 들어가서 돌립니다 (show · run 은 dev 자리에 prod 도 됩니다)
 pnpm migrate:show:dev     # 무엇이 적용될지만 — 읽기 전용
 pnpm migrate:run:dev      # 환경명을 입력해 확인한 뒤 적용
-pnpm migrate:revert:dev   # 마지막 한 건 철회 (revert-dev 를 입력)
+pnpm migrate:revert:dev   # 마지막 한 건 철회 (revert-dev 를 입력) — dev 만
 ```
 
+- **이름은 `동사-대상` (kebab-case), 동사는 SQL 동사입니다.** 스키마 `create | add | alter | rename | drop`,
+  데이터 `insert | update | delete`. 예) `pnpm migration:generate add-board-status`. 이름이 없거나
+  규칙에 맞지 않으면 만들지 않고, 커밋할 때도 막힙니다.
+- **prod 는 되돌리지 않고 새 마이그레이션으로 덮습니다(roll forward).** 이미 적용된 파일을 고치는 게 아니라
+  그 위에 고치는 파일을 하나 더 쌓습니다. 실패한 적용은 트랜잭션째 알아서 롤백됩니다.
 - **엔티티 변경은 `generate`, 데이터 · 수동 SQL 은 `create`** 입니다. 생성된 SQL 은 반드시 읽고 커밋합니다.
 - **단순 컬럼 변경이 `DROP` + `ADD` 로 나오면 `ALTER` 로 손봅니다**(데이터 손실 방지).
 - **적용된 마이그레이션은 고치지 않고 새로 추가합니다.** VS Code 에서는 `src/database/migrations/**` 가 읽기 전용입니다.
@@ -283,7 +289,9 @@ pnpm migrate:revert:dev   # 마지막 한 건 철회 (revert-dev 를 입력)
 
 ## Git Hooks (Husky)
 
-- **pre-commit**: `lint-staged` → 스테이징된 `*.{ts,js}` 에 `eslint --fix` + `prettier --write`.
+- **pre-commit**: `lint-staged` → 스테이징된 `*.{ts,js}` 에 `eslint --fix` + `prettier --write`,
+  마이그레이션 파일에 `migration-lint.sh`(이름 위반은 막음), `*.sh` 에 `shellcheck`.
+  SQL 경고는 커밋 때 화면에 안 나옵니다 — `migration:generate` 직후나 `pnpm migration:lint` 로 봅니다.
 - **pre-push**: `pnpm run test:local`(e2e). DB 를 쓸 수 없으면 `git push --no-verify`.
 - 훅은 `pnpm install` 의 `prepare` 가 설치합니다. git 저장소 안이어야 합니다.
 

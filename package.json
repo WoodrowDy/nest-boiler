@@ -26,21 +26,21 @@
     "test:local": "jest --config ./test/jest-e2e.json --verbose=true --silent=true",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js --dataSource ./src/database/config/typeorm.config.ts",
-    "migration:create": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:create src/database/migrations/Migration",
+    "migration:create": "bash scripts/migration-new.sh create",
     "migration:lint": "bash scripts/migration-lint.sh",
-    "migration:generate": "cross-env NODE_ENV=local pnpm run typeorm migration:generate src/database/migrations/AutoMigration",
+    "migration:generate": "bash scripts/migration-new.sh generate",
+    "migration:check": "cross-env NODE_ENV=local pnpm run typeorm migration:generate src/database/migrations/Check --check",
     "migration:run": "cross-env NODE_ENV=local pnpm run typeorm migration:run",
     "migration:revert": "cross-env NODE_ENV=local pnpm run typeorm migration:revert",
     "seed:run": "cross-env NODE_ENV=local ts-node -r tsconfig-paths/register ./src/database/seeds/run.ts",
-    "setup-db": "pnpm run migration:generate && pnpm run migration:run && pnpm run seed:run",
+    "setup-db": "pnpm run migration:run && pnpm run seed:run",
     "prepare": "husky",
     "migration:show": "cross-env NODE_ENV=local pnpm run typeorm migration:show",
     "migrate:show:dev": "bash scripts/migrate.sh dev show",
     "migrate:run:dev": "bash scripts/migrate.sh dev",
     "migrate:revert:dev": "bash scripts/migrate.sh dev revert",
     "migrate:show:prod": "bash scripts/migrate.sh prod show",
-    "migrate:run:prod": "bash scripts/migrate.sh prod",
-    "migrate:revert:prod": "bash scripts/migrate.sh prod revert"
+    "migrate:run:prod": "bash scripts/migrate.sh prod"
   },
   "dependencies": {
     "@eslint/eslintrc": "^3.1.0",
@@ -113,6 +113,7 @@
       "eslint --fix",
       "prettier --write"
     ],
+    "src/database/migrations/*.ts": "bash scripts/migration-lint.sh",
     "*.sh": [
       "shellcheck"
     ]

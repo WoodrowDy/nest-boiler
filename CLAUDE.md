@@ -43,16 +43,30 @@ pnpm db:reset   # drop volume + restart (full reset)
 ### Migrations & Seeds
 
 ```bash
-pnpm run migration:generate   # generate from entity diff (review before commit!)
-pnpm run migration:create     # empty migration (manual/data changes)
-pnpm run migration:run        # apply
-pnpm run migration:revert     # revert last
-pnpm run seed:run             # run MainSeeder
-pnpm run setup-db             # generate + run + seed
-pnpm run migration:lint       # scan up() for destructive SQL before committing
+pnpm run migration:generate <name>   # run pending, then generate from entity diff (review before commit!)
+pnpm run migration:create <name>     # empty migration (manual/data changes)
+pnpm run migration:check             # entity vs DB diff without writing a file (exit 1 = changes)
+pnpm run migration:run               # apply
+pnpm run migration:revert            # revert last
+pnpm run seed:run                    # run MainSeeder
+pnpm run setup-db                    # run + seed
+pnpm run migration:lint              # file names + destructive SQL in up()
 ```
 
 The commands above pin `NODE_ENV=local`, so they always target the local DB in `envs/.env.local`.
+
+- **A migration is named `verb-object`, kebab-case, with SQL verbs** — the repository's rule again.
+  Schema: `create | add | alter | rename | drop`; data: `insert | update | delete`. `remove` is not
+  accepted (it duplicates `drop`). `pnpm migration:generate add-board-status` writes
+  `<timestamp>-add-board-status.ts` with class `AddBoardStatus<timestamp>`. The rule lives in
+  `scripts/_migration-name.sh`; `migration-new.sh` refuses a missing or bad name, and
+  `migration-lint.sh` blocks one at commit (lint-staged) — names are not a judgment call, so this
+  block needs no `--strict`.
+- **`migration:generate` runs `migration:run` first.** generate diffs the entities against the
+  *local DB*; if that DB lags behind a migration made elsewhere, the change lands in your file a
+  second time and the deploy fails with "already exists". It cannot catch the opposite (a DB ahead
+  of the code, e.g. a column from another branch): generate then emits a `DROP`, which the lint run
+  it prints right after flags as destructive.
 
 **Deploy environments** use a separate, deliberately slower path — run these *on the server* over ssh:
 
@@ -61,6 +75,12 @@ pnpm migrate:show:dev     # what would apply — read-only
 pnpm migrate:run:dev      # apply, after typing the env name to confirm
 pnpm migrate:revert:dev   # revert the last one (type `revert-dev`)
 ```
+
+- **prod is never reverted — roll forward.** Fix a wrong migration with a new one on top; never
+  edit the applied file. `migrate:revert:prod` does not exist, and `migrate.sh prod revert` refuses.
+  A failed apply undoes itself (TypeORM runs all pending migrations in one transaction, default
+  `"all"`, and Postgres rolls DDL back), so a revert would only ever be for one that succeeded but is
+  wrong — and its `down()` usually drops what was just added, values included.
 
 - `scripts/_db-env.sh` resolves `envs/.env.<env>`, prints the target, and refuses on a missing file.
   Set `EXPECTED_DB_NAME` in that env file to also cross-check `DB_NAME` — it catches a prod config
@@ -139,7 +159,8 @@ src/
   database/        # config/typeorm.config.ts, migrations/, seeds/ (main.seed.ts order, run.ts
                    # factory registration), entities/ (core-hard/core-soft base)
 
-scripts/           # db-up/down/reset.sh, migration-lint.sh, migrate.sh, _db-env.sh,
+scripts/           # db-up/down/reset.sh, migration-new.sh, migration-lint.sh, _migration-name.sh
+                   # (name rule both read), migrate.sh, _db-env.sh,
                    # db-connect.sh.example (per-project DB reachability — tunnel/proxy/IAM),
                    # postgres/init-extra-dbs.sh (creates the extra DB on the container's first boot)
 envs/              # env.ts (NODE_ENV -> file), .env.*.example (committed; .env.* are ignored)
@@ -522,7 +543,10 @@ catch sites above rely on:
 
 ## Git Hooks (Husky)
 
-- **pre-commit**: `lint-staged` → `eslint --fix` + `prettier --write` on staged `*.{ts,js}`.
+- **pre-commit**: `lint-staged` → `eslint --fix` + `prettier --write` on staged `*.{ts,js}`,
+  `migration-lint.sh` on staged migrations, `shellcheck` on staged `*.sh`. lint-staged hides the
+  output of passing tasks, so the SQL warnings only show when you run `pnpm migration:lint` (or
+  right after `migration:generate`); a bad name fails, so that one shows.
 - **pre-push**: `pnpm run test:local` (e2e). Needs a running DB — `pretest:local` starts it via `db:up`.
   Use `git push --no-verify` to skip if the DB is unavailable.
 

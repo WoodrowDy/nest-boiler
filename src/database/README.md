@@ -67,24 +67,33 @@ export class Sample extends CoreSoftEntity {
 - 엔티티에는 Swagger · class-validator · class-transformer 를 두지 않습니다 (ESLint 가 막습니다).
 - 새 도메인은 `src/domain/template/users` 를 복사하고 `app.module.ts` 에 모듈을 등록합니다.
 
-### 1.2. 생성 전: 로컬 DB 를 최신으로
+### 1.2. 이름 짓기
 
-```bash
-pnpm migration:run
-```
+**`동사-대상`, kebab-case(소문자 · 숫자 · `-`), 동사는 SQL 동사**입니다. repository 와 같은 원칙입니다.
 
-`migration:generate` 는 엔티티와 **로컬 DB** 의 차이로 파일을 만듭니다. 로컬 DB 가 뒤처져 있으면
-다른 사람이 이미 만든 변경까지 내 마이그레이션에 섞여 들어갑니다.
+| 바꾸는 것 | 동사                                           | 예                                                             |
+| --------- | ---------------------------------------------- | -------------------------------------------------------------- |
+| 스키마    | `create` · `add` · `alter` · `rename` · `drop` | `create-user-table` · `add-board-status` · `rename-user-phone` |
+| 데이터    | `insert` · `update` · `delete`                 | `insert-default-categories` · `update-board-status-default`    |
+
+- `remove` 는 받지 않습니다 — `drop` 과 겹칩니다.
+- 이름이 없거나 규칙에 맞지 않으면 **만들지 않고**, 커밋할 때도 **막힙니다**(1.5).
+- 규칙은 `scripts/_migration-name.sh` 한 곳에 있습니다.
 
 ### 1.3. 마이그레이션 생성
 
 ```bash
-pnpm migration:generate
+pnpm migration:generate add-board-status
 ```
 
-- `src/database/migrations/<타임스탬프>-AutoMigration.ts` 가 생깁니다.
-- **"No changes in database schema were found"**(종료 코드 1) 는 엔티티가 인식되지 않았거나
-  로컬 DB 가 이미 엔티티와 같다는 뜻입니다.
+- `src/database/migrations/<타임스탬프>-add-board-status.ts`, 클래스 `AddBoardStatus<타임스탬프>` 가 생깁니다.
+- **먼저 로컬 DB 를 최신으로 올립니다**(`migration:run`). generate 는 엔티티와 **로컬 DB** 의 차이로
+  파일을 만드는데, 로컬 DB 가 뒤처져 있으면 다른 곳에서 이미 만든 변경까지 내 파일에 또 들어가고
+  배포 환경에서 "already exists" 로 깨집니다.
+- 반대로 **로컬 DB 가 코드보다 앞서 있으면**(다른 브랜치에서 적용한 컬럼이 남아 있으면) 그 컬럼을
+  `DROP` 합니다. 생성 직후 `migration:lint` 결과가 함께 나오니 "파괴적" 이 보이면 확인합니다.
+- **"엔티티와 로컬 DB 가 같습니다"** 가 나오면 만들 게 없다는 뜻입니다 (정상 종료). 엔티티를
+  바꿨는데도 이게 나오면 엔티티가 인식되지 않은 것입니다.
 
 ### 1.4. 생성된 SQL 리뷰 — 가장 중요한 단계
 
@@ -107,18 +116,23 @@ pnpm migration:lint                                      # 스테이징된 마�
 pnpm migration:lint --all                                # 전체
 ```
 
-`up()` 안에서 되돌리기 어려운 구문을 찾아 보여줍니다 — `DROP COLUMN` / `DROP TABLE`,
-`RENAME`, 기존 행 처리 없는 `SET NOT NULL`, 빈 `down()`, 같은 컬럼 `DROP` + `ADD`.
+두 가지를 봅니다.
 
-**막지 않고 보여줍니다.** 걸리는 것 대부분은 의도한 변경이고 판단은 사람이 합니다.
-`--strict` 를 주면 종료 코드 1 로 끊습니다.
+- **파일 이름** — 1.2 규칙에 맞지 않으면 **막습니다**(종료 코드 1). 판단할 여지가 없어서입니다.
+- **`up()` 안에서 되돌리기 어려운 구문** — `DROP COLUMN` / `DROP TABLE`, `RENAME`, 기존 행 처리
+  없는 `SET NOT NULL`, 빈 `down()`, 같은 컬럼 `DROP` + `ADD`. **막지 않고 보여줍니다.** 걸리는 것
+  대부분은 의도한 변경이고 판단은 사람이 합니다. `--strict` 를 주면 종료 코드 1 로 끊습니다.
+
+커밋할 때 pre-commit(lint-staged)이 스테이징된 마이그레이션에 자동으로 돌립니다. **다만 SQL 경고는
+화면에 안 나옵니다** — lint-staged 는 통과한 작업의 출력을 숨깁니다. 그래서 `migration:generate` 가
+만든 직후에 한 번 보여주고, 그 뒤로는 위 명령을 직접 돌려 봅니다.
 
 ### 1.6. 로컬 적용과 검증
 
 ```bash
 pnpm migration:run                            # 적용
 pnpm migration:revert && pnpm migration:run   # (선택) down() 까지 검증
-pnpm migration:generate                       # (선택) "No changes" 가 나오면 엔티티와 DB 가 일치
+pnpm migration:check                          # (선택) 종료 코드 0 이면 엔티티와 DB 가 일치 — 파일은 안 만듦
 ```
 
 - 적용하지 않으면 `start:local` 이 **부팅을 거부**합니다 (7장 참고).
@@ -138,10 +152,10 @@ pnpm migration:revert
 ### 1.8. 데이터 변경 · 수동 SQL
 
 ```bash
-pnpm migration:create
+pnpm migration:create insert-default-categories
 ```
 
-- 빈 마이그레이션 파일을 만들고 SQL 을 직접 씁니다.
+- 빈 마이그레이션 파일을 만들고 SQL 을 직접 씁니다. 이름 규칙은 1.2 와 같습니다.
 - **스키마가 아니라 데이터를 바꿀 때** 씁니다 — 데이터 이관, 코드 테이블 같은 기준 데이터,
   generate 가 표현하지 못하는 SQL.
 - 운영에 꼭 있어야 하는 기준 데이터는 시드가 아니라 여기에 넣습니다. 순서 · 되돌리기 · 부팅
@@ -156,10 +170,15 @@ pnpm migration:create
 ```bash
 pnpm migrate:show:dev      # 접속 대상과 적용 예정 목록 — 읽기 전용
 pnpm migrate:run:dev       # 환경명(dev)을 그대로 입력해야 적용
-pnpm migrate:revert:dev    # 마지막 한 건 철회 (revert-dev 를 입력)
+pnpm migrate:revert:dev    # 마지막 한 건 철회 (revert-dev 를 입력) — dev 만
 ```
 
-- `dev` 자리에 `prod` 도 됩니다. 그 외 환경은 거부합니다.
+- `show` · `run` 은 `dev` 자리에 `prod` 도 됩니다. 그 외 환경은 거부합니다.
+- **prod 는 되돌리지 않습니다 — 새 마이그레이션으로 덮습니다(roll forward).** 이미 적용된 파일을
+  고치는 게 아니라, 고치는 마이그레이션을 그 위에 하나 더 쌓습니다. `migrate:revert:prod` 는 없고
+  `migrate.sh prod revert` 도 거부합니다. 실패한 적용은 알아서 되돌아가서(TypeORM 이 미적용분을 한
+  트랜잭션으로 돌리고 Postgres 는 DDL 도 롤백합니다) revert 할 일은 "성공했는데 틀린 것" 뿐인데,
+  그때 `down()` 은 보통 방금 추가한 컬럼을 값과 함께 지웁니다.
 - **서버의 `pnpm install` 은 devDependencies 까지 설치해야 합니다.** `migrate:*` 는 빌드 결과가
   아니라 `ts-node` 로 `src/` 의 TS 를 직접 돌립니다.
 - **TTY 가 없으면 거부합니다.** `ssh host '명령'` 한 줄로는 확인 입력이 무력해지기 때문입니다.
@@ -255,11 +274,11 @@ pnpm db:reset && pnpm migration:run && pnpm seed:run
 ### 3.1. `setup-db`
 
 ```bash
-pnpm setup-db   # migration:generate → migration:run → seed:run
+pnpm setup-db   # migration:run → seed:run
 ```
 
-**`generate` 가 먼저 돕니다.** 엔티티와 로컬 DB 가 어긋나 있으면 마이그레이션 파일이 새로
-생깁니다. 처음 받은 저장소에서는 `pnpm migration:run && pnpm seed:run` 을 씁니다.
+처음 받은 저장소나 `db:reset` 직후에 씁니다. 마이그레이션을 **만들지는 않습니다** — 이름이 필요한
+일이라 `migration:generate <이름>` 으로 따로 합니다.
 
 ### 3.2. 시드는 로컬 전용입니다
 
@@ -309,16 +328,17 @@ migrate.sh     NODE_ENV="$ENV" pnpm run typeorm ...            환경 지정
 
 ```bash
 # 로컬 — 모두 NODE_ENV=local 고정
-pnpm migration:generate     # 엔티티 변경분으로 생성
-pnpm migration:create       # 빈 마이그레이션 (데이터 변경 · 수동 SQL)
-pnpm migration:lint         # up() 의 되돌리기 어려운 구문 검사
+pnpm migration:generate <이름>   # 로컬 DB 를 최신으로 올린 뒤 엔티티 변경분으로 생성 (1.2 · 1.3)
+pnpm migration:create <이름>     # 빈 마이그레이션 (데이터 변경 · 수동 SQL)
+pnpm migration:check        # 엔티티와 DB 가 같은지만 — 파일 안 만듦 (차이 있으면 종료 코드 1)
+pnpm migration:lint         # 파일 이름 + up() 의 되돌리기 어려운 구문 검사
 pnpm migration:show         # 적용 여부 목록
 pnpm migration:run          # 적용
 pnpm migration:revert       # 마지막 한 건 되돌리기
 pnpm seed:run               # MainSeeder 실행
-pnpm setup-db               # generate + run + seed (3.1 주의)
+pnpm setup-db               # run + seed
 
-# 배포 환경 — 서버에서 (dev 자리에 prod)
+# 배포 환경 — 서버에서 (show · run 은 dev 자리에 prod, revert 는 dev 만)
 pnpm migrate:show:dev
 pnpm migrate:run:dev
 pnpm migrate:revert:dev
@@ -334,12 +354,14 @@ pnpm run typeorm <command>
 ### 🔧 마이그레이션
 
 - ✅ 엔티티 변경은 `migration:generate`, 데이터 변경은 `migration:create`
-- ✅ 생성 전에 `migration:run` 으로 로컬 DB 를 최신으로
+- ✅ 이름은 `동사-대상`, SQL 동사로 (`add-board-status`) — 스크립트와 커밋 훅이 강제한다
+- ✅ 생성 전에 로컬 DB 를 최신으로 — `migration:generate` 가 알아서 `migration:run` 부터 돈다
 - ✅ 생성된 SQL 을 읽고 커밋한다 — `DROP` + `ADD` 는 `RENAME` / `ALTER` 로
 - ✅ 엔티티와 마이그레이션은 한 커밋
 - ✅ **`local` 외 환경은 배포 전에 마이그레이션을 먼저 적용** (`pnpm migrate:run:<env>`)
 - ✅ 컬럼 삭제 · 이름 변경은 배포를 둘로 나눈다 (추가 먼저, 삭제는 다음 배포)
 - ❌ 적용된 마이그레이션 수정 — 새 마이그레이션으로 바로잡는다
+- ❌ prod revert — 새 마이그레이션으로 덮는다 (roll forward, 1.9)
 - ⚠️ `migration:revert` 는 데이터를 되돌리지 않는다
 
 ### 🌱 시드
@@ -358,15 +380,13 @@ pnpm run typeorm <command>
 
 ```
 1. 엔티티 수정                        (1.1)
-2. pnpm migration:run                 로컬 DB 를 최신으로 (1.2)
-3. pnpm migration:generate            (1.3)
-4. 생성된 SQL 리뷰                    (1.4)
-5. pnpm migration:lint <파일>          (1.5)
-6. pnpm migration:run                 + 선택: revert → run, generate 로 "No changes" 확인 (1.6)
-7. 필요하면 시더 · 팩토리 추가 → pnpm seed:run   (2장)
-8. pnpm run test:local
-9. 엔티티 + 마이그레이션 한 커밋
-10. 서버: git pull → migrate:show → migrate:run → 빌드 · 재기동   (1.9, DEPLOY.md)
+2. pnpm migration:generate <이름>     로컬 DB 최신화 → 생성 → lint 결과 출력 (1.2 · 1.3)
+3. 생성된 SQL 리뷰                    (1.4)
+4. pnpm migration:run                 + 선택: revert → run, migration:check (1.6)
+5. 필요하면 시더 · 팩토리 추가 → pnpm seed:run   (2장)
+6. pnpm run test:local
+7. 엔티티 + 마이그레이션 한 커밋       pre-commit 이 이름을 검사 (1.5)
+8. 서버: git pull → migrate:show → migrate:run → 빌드 · 재기동   (1.9, DEPLOY.md)
 ```
 
 ### 처음 받은 저장소
@@ -396,12 +416,19 @@ A: 의도된 동작입니다. `pnpm migration:run` 으로 먼저 적용하세요
 편이 낫다고 보고 `src/global/helpers/pending-migrations.helper.ts` 에서 부팅을 막습니다.
 이 검사가 **마이그레이션 먼저, 배포 나중**이라는 순서를 강제합니다.
 
-**Q: 엔티티를 바꿨는데 "No changes in database schema were found" 가 나와요**
+**Q: 엔티티를 바꿨는데 "엔티티와 로컬 DB 가 같습니다" 가 나와요**
 A: 엔티티 파일이 `src/domain/**/entities/*.entity.ts` 에 있는지 확인하세요. 로컬 DB 가 이미
 엔티티와 같은 상태여도 이렇게 나옵니다 (예: 다른 브랜치에서 이미 적용).
 
 **Q: 생성된 마이그레이션에 내가 안 바꾼 변경이 섞여 있어요**
-A: 로컬 DB 가 뒤처져 있습니다. 파일을 지우고 `pnpm migration:run` 후 다시 생성하세요 (1.2).
+A: `ADD` 가 섞였다면 커밋되지 않은 마이그레이션이 있는 것입니다 — generate 는 커밋된 마이그레이션은
+먼저 적용합니다(1.3). `DROP` 이 섞였다면 로컬 DB 가 코드보다 앞서 있습니다(다른 브랜치에서 적용한
+컬럼). 파일을 지우고, 앞선 쪽을 정리한 뒤(`pnpm db:reset && pnpm setup-db`) 다시 생성하세요.
+
+**Q: 커밋이 "이름이 규칙에 맞지 않는 파일이 있습니다" 로 막혀요**
+A: 마이그레이션 파일 이름이 `<타임스탬프>-동사-대상.ts` 가 아닙니다(1.2). 아직 어디에도 적용하지
+않은 새 파일이면 지우고 `pnpm migration:generate <이름>` 으로 다시 만드세요. 파일 이름만 바꾸면
+클래스 이름이 그대로 남습니다.
 
 **Q: 시드가 중복으로 실패해요**
 A: 시드는 한 번 깔리는 것을 전제로 합니다. `pnpm db:reset && pnpm migration:run && pnpm seed:run`.

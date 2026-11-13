@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AutoMigration1794192144031 implements MigrationInterface {
-    name = 'AutoMigration1794192144031'
+export class CreateUserBoardTables1794192144031 implements MigrationInterface {
+    name = 'CreateUserBoardTables1794192144031'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "User" ("id" SERIAL NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deletedAt" TIMESTAMP WITH TIME ZONE, "email" character varying(255) NOT NULL, "name" character varying(50) NOT NULL, "phone" character varying(15) NOT NULL, "boardCount" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_9862f679340fb2388436a5ab3e4" PRIMARY KEY ("id")); COMMENT ON COLUMN "User"."id" IS '데이터 ID(PK)'; COMMENT ON COLUMN "User"."createdAt" IS '생성 일시'; COMMENT ON COLUMN "User"."updatedAt" IS '수정 일시'; COMMENT ON COLUMN "User"."deletedAt" IS '삭제 일시'; COMMENT ON COLUMN "User"."email" IS '이메일'; COMMENT ON COLUMN "User"."name" IS '이름'; COMMENT ON COLUMN "User"."phone" IS '휴대폰 번호'; COMMENT ON COLUMN "User"."boardCount" IS '작성한 글 수'`);
